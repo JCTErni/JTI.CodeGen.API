@@ -1,4 +1,5 @@
-﻿using System;
+﻿using JTI.CodeGen.API.Models.Constants;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -9,7 +10,12 @@ namespace JTI.CodeGen.API.Common.Helpers
 {
     public static class EncryptionHelper
     {
-        private static readonly string EncryptionKey = "your-encryption-key"; // Use a secure key
+        private static readonly string Base64EncryptionKey = EnvironmentVariableHelper.GetValue(ConfigurationConstants.CodeEncryptionKey);
+
+        private static byte[] GetEncryptionKey()
+        {
+            return Convert.FromBase64String(Base64EncryptionKey);
+        }
 
         public static string Encrypt(string plainText)
         {
@@ -18,7 +24,7 @@ namespace JTI.CodeGen.API.Common.Helpers
 
             using (Aes aes = Aes.Create())
             {
-                aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
+                aes.Key = GetEncryptionKey();
                 aes.IV = iv;
 
                 ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
@@ -47,7 +53,7 @@ namespace JTI.CodeGen.API.Common.Helpers
 
             using (Aes aes = Aes.Create())
             {
-                aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
+                aes.Key = GetEncryptionKey();
                 aes.IV = iv;
 
                 ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);

@@ -13,7 +13,7 @@ namespace JTI.CodeGen.API.Models.Entities
         public string id { get; set; }
         public string Brand { get; set; }
         public string BatchNumber { get; set; }
-        public string HashedCode { get; set; }
+        public string EncryptedCode { get; set; }
         public string DateCreated { get; set; }
         public string CreatedBy { get; set; }
         public string DateUpdated { get; set; }

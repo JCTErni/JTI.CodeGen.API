@@ -39,7 +39,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
                     id = Guid.NewGuid().ToString(),
                     Brand = brand,
                     BatchNumber = batchNumber,
-                    HashedCode = CodeServiceHelper.GenerateHashedCode(brand),
+                    EncryptedCode = CodeServiceHelper.GenerateEncryptedCode(brand),
                     DateCreated = DateTime.UtcNow.ToString(),
                     CreatedBy = "System",
                     DateUpdated = DateTime.UtcNow.ToString(),

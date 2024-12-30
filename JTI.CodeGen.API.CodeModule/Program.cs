@@ -37,7 +37,7 @@ var host = new HostBuilder()
         {
             mapperConfiguration.CreateMap<Code, CodeDto>()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.id))
-                .ForMember(dest => dest.Code, opt => opt.MapFrom(src => src.HashedCode));
+                .ForMember(dest => dest.Code, opt => opt.MapFrom(src => src.EncryptedCode));
         });
 
         services.AddSingleton<ICodeService, CodeService>();
