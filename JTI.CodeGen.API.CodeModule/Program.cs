@@ -9,40 +9,40 @@ using JTI.CodeGen.API.CodeModule.Services.Interfaces;
 using JTI.CodeGen.API.CodeModule.Services;
 using JTI.CodeGen.API.CodeModule.Dtos;
 using JTI.CodeGen.API.Models.Entities;
+using JTI.CodeGen.API.Common.Middleware;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Common.Services;
 
-var builder = FunctionsApplication.CreateBuilder(args);
-// Configure services
-builder.Services.AddSingleton<CosmosDbService>(sp =>
-{
-    // Retrieve the Cosmos DB connection string and other settings from environment variables
-    var connString = EnvironmentVariableHelper.GetValue(ConfigurationConstants.CosmosDbConnectionString);
-    var databaseName = EnvironmentVariableHelper.GetValue(ConfigurationConstants.CosmosDbDatabaseName);
-
-    // Check if the connection string and other settings are not null or empty
-    if (string.IsNullOrEmpty(connString) || string.IsNullOrEmpty(databaseName))
+var host = new HostBuilder()
+    .ConfigureFunctionsWebApplication(worker =>
     {
-        throw new InvalidOperationException("Cosmos DB settings cannot be null or empty.");
-    }
+        worker.UseMiddleware<JwtMiddleware>();
+    })
+    .ConfigureServices(services =>
+    {
+        services.AddSingleton<CosmosDbService>(sp =>
+        {
+            var connString = EnvironmentVariableHelper.GetValue(ConfigurationConstants.CosmosDbConnectionString);
+            var databaseName = EnvironmentVariableHelper.GetValue(ConfigurationConstants.CosmosDbDatabaseName);
 
-    return new CosmosDbService(connString, databaseName);
-});
+            if (string.IsNullOrEmpty(connString) || string.IsNullOrEmpty(databaseName))
+            {
+                throw new InvalidOperationException("Cosmos DB settings cannot be null or empty.");
+            }
 
-// Register the CodeService
-builder.Services.AddSingleton<ICodeService, CodeService>();
+            return new CosmosDbService(connString, databaseName);
+        });
 
-// Register AutoMapper and configure mappings
-builder.Services.AddAutoMapper((mapperConfiguration) =>
-{
-    mapperConfiguration.CreateMap<Code, CodeDto>()
-        .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.id));
-});
+        services.AddAutoMapper((mapperConfiguration) =>
+        {
+            mapperConfiguration.CreateMap<Code, CodeDto>()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.id))
+                .ForMember(dest => dest.Code, opt => opt.MapFrom(src => src.HashedCode));
+        });
 
-// Configure application configuration
-builder.Configuration
-    .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables();
+        services.AddSingleton<ICodeService, CodeService>();
+        services.AddSingleton<IJwtService, JwtService>();
+    })
+    .Build();
 
-// Build and run the application
-var app = builder.Build();
-app.Run();
+await host.RunAsync();

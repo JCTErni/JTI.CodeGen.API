@@ -13,6 +13,7 @@ using JTI.CodeGen.API.UserModule.Dtos;
 using AutoMapper;
 using JTI.CodeGen.API.Models.Enums;
 using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Common.Helpers;
 
 namespace JTI.CodeGen.API.UserModule
 {
@@ -36,14 +37,16 @@ namespace JTI.CodeGen.API.UserModule
         {
             _logger.LogInformation("[Get User List] Function Started.");
 
-            // Check if the user is authenticated and has the SuperAdmin role
-            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, ApprRoleEnum.SuperAdmin.ToString(), _logger) is HttpResponseData authResponse)
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.SuperAdmin.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
                 return authResponse;
             }
 
-            var pageNumber = int.TryParse(req.Query[HttpParameterConstants.PageNumber], out var pn) ? pn : ConfigurationConstants.pageNumber;
-            var pageSize = int.TryParse(req.Query[HttpParameterConstants.PageSize], out var ps) ? ps : ConfigurationConstants.pageSize;
+            var pageNumber = int.TryParse(req.Query[HttpParameterConstants.PageNumber], out var pn) ? pn : ConfigurationConstants.defaultPageNumber;
+            var pageSize = int.TryParse(req.Query[HttpParameterConstants.PageSize], out var ps) ? ps : ConfigurationConstants.defaultPageSize;
 
             var result = await _userDataAccess.GetAllAsync(pageNumber, pageSize);
 
@@ -73,8 +76,10 @@ namespace JTI.CodeGen.API.UserModule
         {
             _logger.LogInformation("[Get User By Email] Function Started.");
 
-            // Check if the user is authenticated and has the SuperAdmin role
-            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, ApprRoleEnum.SuperAdmin.ToString(), _logger) is HttpResponseData authResponse)
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.SuperAdmin.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
                 return authResponse;
             }
@@ -112,8 +117,10 @@ namespace JTI.CodeGen.API.UserModule
         {
             _logger.LogInformation("[Create User] Function Started.");
 
-            // Check if the user is authenticated and has the SuperAdmin role
-            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, ApprRoleEnum.SuperAdmin.ToString(), _logger) is HttpResponseData authResponse)
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.SuperAdmin.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
                 return authResponse;
             }
@@ -172,8 +179,7 @@ namespace JTI.CodeGen.API.UserModule
         [Function("login")]
         public async Task<HttpResponseData> Login([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, FunctionContext executionContext)
         {
-            var logger = executionContext.GetLogger("LoginFunction");
-            logger.LogInformation("Processing login request.");
+            _logger.LogInformation("[Login] Function Started.");
 
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var loginRequest = JsonConvert.DeserializeObject<LoginRequest>(requestBody);

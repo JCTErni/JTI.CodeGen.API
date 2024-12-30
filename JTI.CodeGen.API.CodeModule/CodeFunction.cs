@@ -11,6 +11,11 @@ using JTI.CodeGen.API.Models.Entities;
 using JTI.CodeGen.API.CodeModule.Services.Interfaces;
 using JTI.CodeGen.API.CodeModule.Dtos;
 using AutoMapper;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Models.Enums;
+using JTI.CodeGen.API.Common.Helpers;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Mvc;
 
 namespace JTI.CodeGen.API.CodeModule
 {
@@ -20,13 +25,39 @@ namespace JTI.CodeGen.API.CodeModule
         private readonly CosmosDbService _cosmosDbService;
         private readonly ICodeService _codeService;
         private readonly IMapper _mapper;
+        private readonly IJwtService _jwtService;
 
-        public CodeFunction(ILogger<CodeFunction> logger, CosmosDbService cosmosDbService, ICodeService codeService, IMapper mapper)
+        public CodeFunction(ILogger<CodeFunction> logger, CosmosDbService cosmosDbService, ICodeService codeService, IMapper mapper, IJwtService jwtService)
         {
             _logger = logger;
             _cosmosDbService = cosmosDbService;
             _codeService = codeService;
             _mapper = mapper;
+            _jwtService = jwtService;
+        }
+
+        [Function("get-all-codes")]
+        public async Task<HttpResponseData> GetAllCodes([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, FunctionContext context)
+        {
+            _logger.LogInformation("[Get All Codes] Function Started.");
+
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+            {
+                return authResponse;
+            }
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            var result = await _codeService.GetAllCodesAsync();
+
+            var codeDtos = _mapper.Map<List<CodeDto>>(result);
+
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDtos));
+
+            return response;
         }
 
         [Function("generate-codes")]
@@ -51,18 +82,31 @@ namespace JTI.CodeGen.API.CodeModule
             return response;
         }
 
-        [Function("get-all-codes")]
-        public async Task<HttpResponseData> GetAllCodes([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+        [Function("generate-encryption-key")]
+        public async Task<HttpResponseData> GenerateEncryptionKey([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
         {
-            _logger.LogInformation("C# HTTP trigger function processed a request to get all codes.");
+            _logger.LogInformation("[Generate Encryption Key] Function Started.");
 
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            var codes = await _codeService.GetAllCodesAsync();
+            // Define the key length (e.g., 256 bits for AES-256)
+            int keyLength = 256 / 8; // 32 bytes
 
-            var codeDtos = _mapper.Map<List<CodeDto>>(codes);
+            // Generate a secure random key
+            byte[] key = new byte[keyLength];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(key);
+            }
 
-            response.Headers.Add("Content-Type", "application/json");
-            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDtos));
+            // Convert the key to a base64 string for easier handling
+            string base64Key = Convert.ToBase64String(key);
+
+            // Create the response
+            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            // Write the key to the response body as JSON
+            var responseBody = new { Key = base64Key };
+            await response.WriteStringAsync(JsonConvert.SerializeObject(responseBody));
 
             return response;
         }

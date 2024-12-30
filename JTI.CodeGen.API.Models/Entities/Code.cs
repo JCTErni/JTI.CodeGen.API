@@ -12,12 +12,15 @@ namespace JTI.CodeGen.API.Models.Entities
     {
         public string id { get; set; }
         public string Brand { get; set; }
-        public string batchNumber { get; set; }
+        public string BatchNumber { get; set; }
         public string HashedCode { get; set; }
-        public DateTime DateCreated { get; set; }
+        public string DateCreated { get; set; }
         public string CreatedBy { get; set; }
-        public DateTime DateUpdated { get; set; }
+        public string DateUpdated { get; set; }
         public string UpdatedBy { get; set; }
-        public CodeStatusEnum Status { get; set; }
+        public string DateConsumed { get; set; }
+        public string Status { get; set; }
+        public string PrinterName { get; set; }
+        public string PrinterAddress { get; set; }
     }
 }

@@ -8,9 +8,10 @@ namespace JTI.CodeGen.API.Models.Enums
 {
     public enum CodeStatusEnum
     {
-        Generated = 0,
-        Printed = 1,
-        Used = 2,
+        Pending = 0,
+        Active = 1,
+        Consumed = 2,
         Inactive = 3,
+        Archived = 4
     }
 }

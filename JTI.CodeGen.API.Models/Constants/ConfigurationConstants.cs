@@ -12,9 +12,9 @@ namespace JTI.CodeGen.API.Models.Constants
         public const string CosmosDbDatabaseName = "CosmosDbDatabaseName";
         public const string JWTSecret = "JWTSecret";
         public const string JWTIssuer = "JWTIssuer";
-        public const string Brand1Container = "BrandACodes";
+        public const string Brand1Container = "BrandBCodes";
         public const string UserContainer = "Users";
-        public const int pageNumber = 1;
-        public const int pageSize = 10;
+        public const int defaultPageNumber = 1;
+        public const int defaultPageSize = 10;
     }
 }

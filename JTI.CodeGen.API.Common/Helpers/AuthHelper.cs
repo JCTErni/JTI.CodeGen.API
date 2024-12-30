@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace JTI.CodeGen.API.UserModule.Helpers
+namespace JTI.CodeGen.API.Common.Helpers
 {
     public static class AuthHelper
     {
@@ -23,11 +23,10 @@ namespace JTI.CodeGen.API.UserModule.Helpers
             return (userClaims, null);
         }
 
-        public static async Task<HttpResponseData> CheckUserRole(IDictionary<string, string> userClaims, HttpRequestData req, string requiredRole, ILogger logger)
+        public static async Task<HttpResponseData> CheckUserRole(IDictionary<string, string> userClaims, HttpRequestData req, List<string> validRoles)
         {
-            if (!userClaims.TryGetValue("AppRole", out var appRole) || appRole != requiredRole)
+            if (!userClaims.TryGetValue("AppRole", out var appRole) || !validRoles.Contains(appRole))
             {
-                logger.LogWarning($"User does not have the {requiredRole} role.");
                 var forbiddenResponse = req.CreateResponse(HttpStatusCode.Forbidden);
                 await forbiddenResponse.WriteStringAsync($"Forbidden: You do not have permission to perform this action.");
                 return forbiddenResponse;
@@ -35,7 +34,7 @@ namespace JTI.CodeGen.API.UserModule.Helpers
             return null;
         }
 
-        public static async Task<HttpResponseData> CheckAuthenticationAndAuthorization(FunctionContext context, HttpRequestData req, string requiredRole, ILogger logger)
+        public static async Task<HttpResponseData> CheckAuthenticationAndAuthorization(FunctionContext context, HttpRequestData req, List<string> validRoles)
         {
             var (userClaims, authResponse) = await CheckUserAuthentication(context, req);
             if (authResponse != null)
@@ -43,7 +42,7 @@ namespace JTI.CodeGen.API.UserModule.Helpers
                 return authResponse;
             }
 
-            var roleResponse = await CheckUserRole(userClaims, req, requiredRole, logger);
+            var roleResponse = await CheckUserRole(userClaims, req, validRoles);
             if (roleResponse != null)
             {
                 return roleResponse;

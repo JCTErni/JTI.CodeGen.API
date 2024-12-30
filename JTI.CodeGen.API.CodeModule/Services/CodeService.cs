@@ -38,16 +38,16 @@ namespace JTI.CodeGen.API.CodeModule.Services
                 {
                     id = Guid.NewGuid().ToString(),
                     Brand = brand,
-                    batchNumber = batchNumber,
+                    BatchNumber = batchNumber,
                     HashedCode = CodeServiceHelper.GenerateHashedCode(brand),
-                    DateCreated = DateTime.UtcNow,
+                    DateCreated = DateTime.UtcNow.ToString(),
                     CreatedBy = "System",
-                    DateUpdated = DateTime.UtcNow,
+                    DateUpdated = DateTime.UtcNow.ToString(),
                     UpdatedBy = "System",
-                    Status = CodeStatusEnum.Generated
+                    Status = CodeStatusEnum.Pending.ToString(),
                 };
                 codes.Add(code);
-                await _cosmosDbService.AddItemAsync<Code>(code, ConfigurationConstants.Brand1Container, code.batchNumber);
+                await _cosmosDbService.AddItemAsync<Code>(code, ConfigurationConstants.Brand1Container, new PartitionKey(code.BatchNumber));
             }
             return codes;
         }

@@ -13,7 +13,7 @@ using JTI.CodeGen.API.Common.DataAccess.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using JTI.CodeGen.API.UserModule.Middleware;
+using JTI.CodeGen.API.Common.Middleware;
 using Microsoft.Extensions.Logging;
 
 var host = new HostBuilder()
