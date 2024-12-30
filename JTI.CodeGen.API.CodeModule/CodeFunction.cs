@@ -42,18 +42,24 @@ namespace JTI.CodeGen.API.CodeModule
             _logger.LogInformation("[Get All Codes] Function Started.");
 
             // Define a list of valid roles
-            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString() };
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString(), ApprRoleEnum.Printer.ToString() };
             // Check if the user is authenticated and has a valid role
             if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
                 return authResponse;
             }
 
+            // Retrieve the encrypted codes from the database
+            var encryptedCodes = await _codeService.GetAllCodesAsync();
+
+            // Decrypt the codes
+            var decryptedCodes = _codeService.DecryptCodes(encryptedCodes);
+
+            // Map the decrypted codes to DTOs
+            var codeDtos = _mapper.Map<List<CodeDto>>(decryptedCodes);
+
+            // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            var result = await _codeService.GetAllCodesAsync();
-
-            var codeDtos = _mapper.Map<List<CodeDto>>(result);
-
             response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(JsonConvert.SerializeObject(codeDtos));
 
@@ -74,54 +80,28 @@ namespace JTI.CodeGen.API.CodeModule
                 return authResponse;
             }
 
-            try
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            _logger.LogInformation("[Generate Codes] Request body read successfully.");
+            var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
+            _logger.LogInformation("[Generate Codes] Request deserialized successfully.");
+
+            if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand))
             {
-                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                _logger.LogInformation("[Generate Codes] Request body read successfully.");
-                var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
-                _logger.LogInformation("[Generate Codes] Request deserialized successfully.");
-
-                if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand))
-                {
-                    _logger.LogWarning("[Generate Codes] Missing required parameters.");
-                    var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badRequestResponse.WriteStringAsync("Missing required parameters.");
-                    return badRequestResponse;
-                }
-
-                _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
-                var result = await _codeService.GenerateCodesAsync(generateCodeRequest.NumberOfCodes, generateCodeRequest.Brand);
-
-                var response = result is not null ? req.CreateResponse(HttpStatusCode.OK)
-                                          : req.CreateResponse(HttpStatusCode.BadRequest);
-
-                if (result is not null)
-                {
-                    _logger.LogInformation("[Generate Codes] Codes generated successfully.");
-                }
-                else
-                {
-                    _logger.LogWarning("[Generate Codes] Code generation failed.");
-                }
-
-                await response.WriteAsJsonAsync(result);
-
-                return response;
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "[Generate Codes] Error parsing request body.");
+                _logger.LogWarning("[Generate Codes] Missing required parameters.");
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteStringAsync("Invalid JSON format.");
+                await badRequestResponse.WriteStringAsync("Missing required parameters.");
                 return badRequestResponse;
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[Generate Codes] An error occurred while generating codes.");
-                var internalServerErrorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                await internalServerErrorResponse.WriteStringAsync("An error occurred while processing your request.");
-                return internalServerErrorResponse;
-            }
+
+            _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
+            await _codeService.GenerateCodesAsync(generateCodeRequest.NumberOfCodes, generateCodeRequest.Brand);
+
+            _logger.LogInformation("[Generate Codes] Codes generated successfully.");
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteStringAsync($"Successfully generated {generateCodeRequest.NumberOfCodes} codes.");
+
+            return response;
         }
 
         [Function("generate-encryption-key")]

@@ -10,9 +10,21 @@ namespace JTI.CodeGen.API.CodeModule.Helpers
 {
     public static class CodeServiceHelper
     {
-        public static string GenerateEncryptedCode(string input)
+        public static string GenerateEncryptedCode()
         {
-            return EncryptionHelper.Encrypt(input + Guid.NewGuid().ToString());
+            // Generate a 9-character alphanumeric code
+            string randomCode = GenerateRandomCode(9);
+
+            // Encrypt the generated code
+            return EncryptionHelper.Encrypt(randomCode);
+        }
+
+        public static string GenerateRandomCode(int length)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, length)
+                                        .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         public static string GenerateBatchNumber(string brand)

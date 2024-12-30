@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using JTI.CodeGen.API.CodeModule.Helpers;
 using Microsoft.Azure.Cosmos;
 using JTI.CodeGen.API.Models.Constants;
+using JTI.CodeGen.API.Common.Helpers;
 
 
 namespace JTI.CodeGen.API.CodeModule.Services
@@ -39,7 +40,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
                     id = Guid.NewGuid().ToString(),
                     Brand = brand,
                     BatchNumber = batchNumber,
-                    EncryptedCode = CodeServiceHelper.GenerateEncryptedCode(brand),
+                    EncryptedCode = CodeServiceHelper.GenerateEncryptedCode(),
                     DateCreated = DateTime.UtcNow.ToString(),
                     CreatedBy = "System",
                     DateUpdated = DateTime.UtcNow.ToString(),
@@ -67,5 +68,13 @@ namespace JTI.CodeGen.API.CodeModule.Services
             return codes;
         }
 
+        public List<Code> DecryptCodes(List<Code> encryptedCodes)
+        {
+            foreach (var encryptedCode in encryptedCodes)
+            {
+                encryptedCode.EncryptedCode = EncryptionHelper.Decrypt(encryptedCode.EncryptedCode);
+            }
+            return encryptedCodes;
+        }
     }
 }

@@ -11,5 +11,6 @@ namespace JTI.CodeGen.API.CodeModule.Services.Interfaces
     {
         Task<List<Code>> GenerateCodesAsync(int numberOfCodes, string brand);
         Task<List<Code>> GetAllCodesAsync();
+        List<Code> DecryptCodes(List<Code> encryptedCodes);
     }
 }
