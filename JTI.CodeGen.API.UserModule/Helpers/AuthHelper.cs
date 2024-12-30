@@ -1,0 +1,55 @@
+﻿using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Azure.Functions.Worker;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+
+namespace JTI.CodeGen.API.UserModule.Helpers
+{
+    public static class AuthHelper
+    {
+        public static async Task<(IDictionary<string, string> userClaims, HttpResponseData response)> CheckUserAuthentication(FunctionContext context, HttpRequestData req)
+        {
+            if (!context.Items.TryGetValue("User", out var userObj) || userObj is not IDictionary<string, string> userClaims)
+            {
+                var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                await unauthorizedResponse.WriteStringAsync("Unauthorized");
+                return (null, unauthorizedResponse);
+            }
+            return (userClaims, null);
+        }
+
+        public static async Task<HttpResponseData> CheckUserRole(IDictionary<string, string> userClaims, HttpRequestData req, string requiredRole, ILogger logger)
+        {
+            if (!userClaims.TryGetValue("AppRole", out var appRole) || appRole != requiredRole)
+            {
+                logger.LogWarning($"User does not have the {requiredRole} role.");
+                var forbiddenResponse = req.CreateResponse(HttpStatusCode.Forbidden);
+                await forbiddenResponse.WriteStringAsync($"Forbidden: You do not have permission to perform this action.");
+                return forbiddenResponse;
+            }
+            return null;
+        }
+
+        public static async Task<HttpResponseData> CheckAuthenticationAndAuthorization(FunctionContext context, HttpRequestData req, string requiredRole, ILogger logger)
+        {
+            var (userClaims, authResponse) = await CheckUserAuthentication(context, req);
+            if (authResponse != null)
+            {
+                return authResponse;
+            }
+
+            var roleResponse = await CheckUserRole(userClaims, req, requiredRole, logger);
+            if (roleResponse != null)
+            {
+                return roleResponse;
+            }
+
+            return null;
+        }
+    }
+}
