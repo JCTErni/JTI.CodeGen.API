@@ -15,6 +15,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using JTI.CodeGen.API.Common.Middleware;
 using Microsoft.Extensions.Logging;
+using JTI.CodeGen.API.UserModule.Services.Interfaces;
+using JTI.CodeGen.API.UserModule.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -37,6 +39,7 @@ var host = new HostBuilder()
         });
 
         services.AddSingleton<IUserDataAccess, UserDataAccess>();
+        services.AddSingleton<IUserService, UserService>();
 
         services.AddAutoMapper((mapperConfiguration) =>
         {

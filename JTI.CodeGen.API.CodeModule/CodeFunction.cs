@@ -16,6 +16,8 @@ using JTI.CodeGen.API.Models.Enums;
 using JTI.CodeGen.API.Common.Helpers;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Mvc;
+using JTI.CodeGen.API.Common.DataAccess.Interfaces;
+using JTI.CodeGen.API.Models.Constants;
 
 namespace JTI.CodeGen.API.CodeModule
 {
@@ -65,7 +67,46 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
+        
+        [Function("get-codes-paginated")]
+        public async Task<HttpResponseData> GetCodesPaginated([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, FunctionContext context)
+        {
+            _logger.LogInformation("[Get Codes Paginated] Function Started.");
 
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+            {
+                return authResponse;
+            }
+
+            var pageSize = int.TryParse(req.Query[HttpParameterConstants.PageSize], out var ps) ? ps : ConfigurationConstants.defaultPageSize;
+
+            var encryptedCodes = await _codeService.GetAllCodesAsync();
+
+            var decryptedCodes = _codeService.DecryptCodes(encryptedCodes);
+
+            var codeDtos = _mapper.Map<List<CodeDto>>(decryptedCodes);
+
+            // Organize codes into a dictionary for pagination
+            var codeDictionary = new Dictionary<int, List<CodeDto>>();
+            int totalPages = (int)Math.Ceiling((double)codeDtos.Count() / pageSize);
+
+            for (int i = 1; i <= totalPages; i++)
+            {
+                var pageCodes = codeDtos.Skip((i - 1) * pageSize).Take(pageSize).ToList();
+                codeDictionary.Add(i, pageCodes);
+            }
+
+            // Create the response
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDictionary));
+
+            return response;
+        }
+        
         [Function("generate-codes")]
         public async Task<HttpResponseData> GenerateCode([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req, FunctionContext context)
         {

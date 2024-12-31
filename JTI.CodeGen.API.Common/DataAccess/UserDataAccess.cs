@@ -20,11 +20,9 @@ namespace JTI.CodeGen.API.Common.DataAccess
             _userContainer = _cosmosDbService.GetContainer(ConfigurationConstants.UserContainer);
         }
 
-        public async Task<IEnumerable<Models.Entities.User>> GetAllAsync(int pageNumber, int pageSize)
+        public async Task<IEnumerable<Models.Entities.User>> GetAllUsersAsync()
         {
-            var query = new QueryDefinition("SELECT * FROM c OFFSET @offset LIMIT @limit")
-                .WithParameter("@offset", (pageNumber - 1) * pageSize)
-                .WithParameter("@limit", pageSize);
+            var query = new QueryDefinition("SELECT * FROM c");
 
             var iterator = _userContainer.GetItemQueryIterator<Models.Entities.User>(query);
             var users = new List<Models.Entities.User>();
