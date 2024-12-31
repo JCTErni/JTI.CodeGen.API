@@ -160,6 +160,12 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Ensure the query parameter name matches
             var id = req.Query[HttpParameterConstants.Id];
+            if (string.IsNullOrEmpty(id))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("id query parameter is missing.");
+                return badRequestResponse;
+            }
 
             // Retrieve the encrypted code by ID from the database
             var encryptedCode = await _codeService.GetCodeByIdAsync(id);
@@ -184,6 +190,53 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
+
+        [Function("get-by-code")]
+        public async Task<HttpResponseData> GetByCode([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, FunctionContext context)
+        {
+            _logger.LogInformation("[Get By Code] Function Started.");
+
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString(), ApprRoleEnum.Printer.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+            {
+                return authResponse;
+            }
+
+            // Ensure the query parameter name matches
+            var code = req.Query[HttpParameterConstants.Code];
+            if (string.IsNullOrEmpty(code))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Code query parameter is missing.");
+                return badRequestResponse;
+            }
+
+            // Retrieve the encrypted code by the provided code from the database
+            var encryptedCode = await _codeService.GetByCodeAsync(code);
+
+            if (encryptedCode == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync($"Code {code} not found.");
+                return notFoundResponse;
+            }
+
+            // Decrypt the code
+            encryptedCode.EncryptedCode = EncryptionHelper.Decrypt(encryptedCode.EncryptedCode);
+
+            // Map the decrypted code to a DTO
+            var codeDto = _mapper.Map<CodeDto>(encryptedCode);
+
+            // Create the response
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+
+            return response;
+        }
+        
         //[Function("update-code-status")]
         //public async Task<HttpResponseData> UpdateCodeStatus([HttpTrigger(AuthorizationLevel.Function, "put")] HttpRequestData req, FunctionContext context)
         //{
