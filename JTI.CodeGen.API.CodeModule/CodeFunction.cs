@@ -62,8 +62,9 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(JsonConvert.SerializeObject(codeDtos));
+
+            _logger.LogInformation("[Get All Codes] Function Completed.");
 
             return response;
         }
@@ -101,8 +102,9 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(JsonConvert.SerializeObject(codeDictionary));
+
+            _logger.LogInformation("[Get Codes Paginated] Function Completed.");
 
             return response;
         }
@@ -141,6 +143,8 @@ namespace JTI.CodeGen.API.CodeModule
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteStringAsync($"Successfully generated {generateCodeRequest.NumberOfCodes} codes.");
+
+            _logger.LogInformation("[Generate Codes] Function Completed.");
 
             return response;
         }
@@ -185,8 +189,9 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+
+            _logger.LogInformation("[Get Code By Id] Function Completed.");
 
             return response;
         }
@@ -231,53 +236,84 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json");
             await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+
+            _logger.LogInformation("[Get By Code] Function Completed.");
 
             return response;
         }
-        
-        //[Function("update-code-status")]
-        //public async Task<HttpResponseData> UpdateCodeStatus([HttpTrigger(AuthorizationLevel.Function, "put")] HttpRequestData req, FunctionContext context)
-        //{
-        //    _logger.LogInformation("[Update User Status] Function Started.");
 
-        //    // Define a list of valid roles
-        //    var validRoles = new List<string> { ApprRoleEnum.SuperAdmin.ToString() };
-        //    // Check if the user is authenticated and has a valid role
-        //    if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
-        //    {
-        //        return authResponse;
-        //    }
+        [Function("update-code-status")]
+        public async Task<HttpResponseData> UpdateCodeStatus([HttpTrigger(AuthorizationLevel.Function, "put")] HttpRequestData req, FunctionContext context)
+        {
+            _logger.LogInformation("[Update Code Status] Function Started.");
 
-        //    // Parse the request body to get the new status
-        //    var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-        //    var updateRequest = JsonConvert.DeserializeObject<UpdateCodeStatusRequest>(requestBody);
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString()};
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+            {
+                return authResponse;
+            }
 
-        //    if (updateRequest == null || string.IsNullOrEmpty(updateRequest.NewStatus))
-        //    {
-        //        var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-        //        await badRequestResponse.WriteAsJsonAsync(new { message = "Invalid request body" });
-        //        return badRequestResponse;
-        //    }
+            // Parse the request body
+            var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            var updateCodeStatusRequest = JsonConvert.DeserializeObject<UpdateCodeStatusRequest>(requestBody);
 
-        //    // Update the user status
-        //    var updateResult = await _userDataAccess.UpdateUserStatusAsync(userId, updateRequest.NewStatus);
+            // Validate that at least one of Id or Code has a value
+            if (string.IsNullOrEmpty(updateCodeStatusRequest.Id) && string.IsNullOrEmpty(updateCodeStatusRequest.Code))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Either Id or Code must be provided.");
+                return badRequestResponse;
+            }
 
-        //    if (!updateResult)
-        //    {
-        //        var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
-        //        await notFoundResponse.WriteAsJsonAsync(new { message = "User not found" });
-        //        return notFoundResponse;
-        //    }
+            // Validate the new status
+            if (!Enum.TryParse<CodeStatusEnum>(updateCodeStatusRequest.NewStatus, out var newStatus))
+            {
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Invalid status value.");
+                return badRequestResponse;
+            }
 
-        //    var response = req.CreateResponse(HttpStatusCode.OK);
-        //    await response.WriteAsJsonAsync(new { message = "User status updated successfully" });
+            // Retrieve the code from the database
+            var codeToUpdate = updateCodeStatusRequest.Id == null ? 
+                await _codeService.GetCodeByIdAsync(updateCodeStatusRequest.Id) :
+                await _codeService.GetByCodeAsync(updateCodeStatusRequest.Code);
 
-        //    _logger.LogInformation("[Update User Status] Function Completed.");
+            if (codeToUpdate == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync("Code not found.");
+                return notFoundResponse;
+            }
 
-        //    return response;
-        //}
+            // Check if the new status is different from the current status
+            if (codeToUpdate.Status == newStatus.ToString())
+            {
+                var okResponse = req.CreateResponse(HttpStatusCode.OK);
+                await okResponse.WriteStringAsync($"Status is already {newStatus.ToString()}");
+                return okResponse;
+            }
+
+            // Update the code status
+            var updatedCode = await _codeService.UpdateCodeStatusAsync(codeToUpdate, newStatus);
+
+            if (updatedCode == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync("Code not found or update failed.");
+                return notFoundResponse;
+            }
+
+            // Create the response
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteStringAsync("Status updated successfully.");
+
+            _logger.LogInformation("[Update Code Status] Function Completed.");
+
+            return response;
+        }
 
         [Function("generate-encryption-key")]
         public async Task<HttpResponseData> GenerateEncryptionKey([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)

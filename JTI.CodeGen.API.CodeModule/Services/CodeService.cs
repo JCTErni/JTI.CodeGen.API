@@ -15,7 +15,6 @@ using JTI.CodeGen.API.Models.Constants;
 using JTI.CodeGen.API.Common.Helpers;
 using System.Net;
 
-
 namespace JTI.CodeGen.API.CodeModule.Services
 {
     public class CodeService : ICodeService
@@ -105,35 +104,15 @@ namespace JTI.CodeGen.API.CodeModule.Services
             return encryptedCodes;
         }
 
-        //public async Task<bool> UpdateCodeStatusAsync(string codeId, string newStatus)
-        //{
-        //    var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @codeId")
-        //        .WithParameter("@codeId", codeId);
+        public async Task<Code> UpdateCodeStatusAsync(Code codeToUpdate, CodeStatusEnum newStatus)
+        {
+            // Update the status and DateUpdated
+            codeToUpdate.Status = newStatus.ToString();
+            codeToUpdate.DateUpdated = DateTime.UtcNow.ToString();
 
-        //    var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
-        //    Code code = null;
-
-        //    while (iterator.HasMoreResults)
-        //    {
-        //        var response = await iterator.ReadNextAsync();
-        //        code = response.FirstOrDefault();
-        //        if (code != null)
-        //        {
-        //            break;
-        //        }
-        //    }
-
-        //    if (code == null)
-        //    {
-        //        return false;
-        //    }
-
-        //    // Update the status
-        //    code.Status = newStatus;
-
-        //    // Replace the item in the container
-        //    await container.ReplaceItemAsync(code, code.Id, new PartitionKey(code.PartitionKey));
-        //    return true;
-        //}
+            // Replace the item in the container
+            await _codeContainer.ReplaceItemAsync(codeToUpdate, codeToUpdate.id, new PartitionKey(codeToUpdate.BatchNumber));
+            return codeToUpdate;
+        }
     }
 }

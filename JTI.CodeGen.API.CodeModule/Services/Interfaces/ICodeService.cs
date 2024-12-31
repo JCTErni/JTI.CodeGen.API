@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using JTI.CodeGen.API.Models.Entities;
+using JTI.CodeGen.API.Models.Enums;
 
 namespace JTI.CodeGen.API.CodeModule.Services.Interfaces
 {
@@ -14,5 +15,6 @@ namespace JTI.CodeGen.API.CodeModule.Services.Interfaces
         Task<Code> GetCodeByIdAsync(string id);
         Task<Code> GetByCodeAsync(string code);
         List<Code> DecryptCodes(List<Code> encryptedCodes);
+        Task<Code> UpdateCodeStatusAsync(Code codeToUpdate, CodeStatusEnum newStatus);
     }
 }
