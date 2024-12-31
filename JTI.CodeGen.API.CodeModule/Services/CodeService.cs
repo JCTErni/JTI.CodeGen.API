@@ -13,19 +13,31 @@ using JTI.CodeGen.API.CodeModule.Helpers;
 using Microsoft.Azure.Cosmos;
 using JTI.CodeGen.API.Models.Constants;
 using JTI.CodeGen.API.Common.Helpers;
+using System.Net;
 
 
 namespace JTI.CodeGen.API.CodeModule.Services
 {
     public class CodeService : ICodeService
     {
-        private readonly ILogger<CodeService> _logger;
-        private readonly CosmosDbService _cosmosDbService;
+        private readonly Container _codeContainer;
 
-        public CodeService(ILogger<CodeService> logger, CosmosDbService cosmosDbService)
+        public CodeService(CosmosDbService cosmosDbService)
         {
-            _logger = logger;
-            _cosmosDbService = cosmosDbService;
+            _codeContainer = cosmosDbService.GetContainer(ConfigurationConstants.CodeContainer);
+        }
+
+        public async Task<List<Code>> GetAllCodesAsync()
+        {
+            var query = "SELECT * FROM c";
+            var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
+            var codes = new List<Code>();
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                codes.AddRange(response);
+            }
+            return codes;
         }
 
         public async Task<List<Code>> GenerateCodesAsync(int numberOfCodes, string brand)
@@ -48,24 +60,40 @@ namespace JTI.CodeGen.API.CodeModule.Services
                     Status = CodeStatusEnum.Pending.ToString(),
                 };
                 codes.Add(code);
-                await _cosmosDbService.AddItemAsync<Code>(code, ConfigurationConstants.Brand1Container, new PartitionKey(code.BatchNumber));
+                await _codeContainer.CreateItemAsync(code, new PartitionKey(code.BatchNumber));
             }
             return codes;
         }
-
-        public async Task<List<Code>> GetAllCodesAsync()
+        
+        public async Task<Code> GetCodeByIdAsync(string id)
         {
-            var query = "SELECT * FROM c";
+            var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
+                .WithParameter("@id", id);
+            var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
             var codes = new List<Code>();
-            var iterator = _cosmosDbService.GetContainer(ConfigurationConstants.Brand1Container).GetItemQueryIterator<Code>(new QueryDefinition(query));
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                codes.AddRange(response);
+            }
+            return codes.FirstOrDefault();
+        }
 
+        public async Task<Code> GetByCodeAsync(string code)
+        {
+            var encryptedCode = EncryptionHelper.Encrypt(code);
+            var query = new QueryDefinition("SELECT * FROM c WHERE c.EncryptedCode = @encryptedCode")
+                .WithParameter("@encryptedCode", encryptedCode);
+
+            var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
+            var codes = new List<Code>();
             while (iterator.HasMoreResults)
             {
                 var response = await iterator.ReadNextAsync();
                 codes.AddRange(response);
             }
 
-            return codes;
+            return codes.FirstOrDefault();
         }
 
         public List<Code> DecryptCodes(List<Code> encryptedCodes)
@@ -76,5 +104,36 @@ namespace JTI.CodeGen.API.CodeModule.Services
             }
             return encryptedCodes;
         }
+
+        //public async Task<bool> UpdateCodeStatusAsync(string codeId, string newStatus)
+        //{
+        //    var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @codeId")
+        //        .WithParameter("@codeId", codeId);
+
+        //    var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
+        //    Code code = null;
+
+        //    while (iterator.HasMoreResults)
+        //    {
+        //        var response = await iterator.ReadNextAsync();
+        //        code = response.FirstOrDefault();
+        //        if (code != null)
+        //        {
+        //            break;
+        //        }
+        //    }
+
+        //    if (code == null)
+        //    {
+        //        return false;
+        //    }
+
+        //    // Update the status
+        //    code.Status = newStatus;
+
+        //    // Replace the item in the container
+        //    await container.ReplaceItemAsync(code, code.Id, new PartitionKey(code.PartitionKey));
+        //    return true;
+        //}
     }
 }

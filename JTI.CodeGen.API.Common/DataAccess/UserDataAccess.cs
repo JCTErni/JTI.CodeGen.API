@@ -12,18 +12,15 @@ namespace JTI.CodeGen.API.Common.DataAccess
 {
     public class UserDataAccess : IUserDataAccess
     {
-        private readonly CosmosDbService _cosmosDbService;
         private readonly Container _userContainer;
         public UserDataAccess(CosmosDbService cosmosDbService)
         {
-            _cosmosDbService = cosmosDbService;
-            _userContainer = _cosmosDbService.GetContainer(ConfigurationConstants.UserContainer);
+            _userContainer = cosmosDbService.GetContainer(ConfigurationConstants.UserContainer);
         }
 
         public async Task<IEnumerable<Models.Entities.User>> GetAllUsersAsync()
         {
             var query = new QueryDefinition("SELECT * FROM c");
-
             var iterator = _userContainer.GetItemQueryIterator<Models.Entities.User>(query);
             var users = new List<Models.Entities.User>();
 

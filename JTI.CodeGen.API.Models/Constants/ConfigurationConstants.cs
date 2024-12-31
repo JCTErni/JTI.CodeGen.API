@@ -13,7 +13,7 @@ namespace JTI.CodeGen.API.Models.Constants
         public const string JWTSecret = "JWTSecret";
         public const string JWTIssuer = "JWTIssuer";
         public const string CodeEncryptionKey = "CodeEncryptionKey";
-        public const string Brand1Container = "BrandBCodes";
+        public const string CodeContainer = "BrandBCodes";
         public const string UserContainer = "Users";
         public const int defaultPageNumber = 1;
         public const int defaultPageSize = 10;

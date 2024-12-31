@@ -74,7 +74,7 @@ namespace JTI.CodeGen.API.CodeModule
             _logger.LogInformation("[Get Codes Paginated] Function Started.");
 
             // Define a list of valid roles
-            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString() };
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString(), ApprRoleEnum.Printer.ToString() };
             // Check if the user is authenticated and has a valid role
             if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
@@ -144,6 +144,87 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
+
+        [Function("get-code-by-id")]
+        public async Task<HttpResponseData> GetCodeById([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, FunctionContext context)
+        {
+            _logger.LogInformation("[Get Code By Id] Function Started.");
+
+            // Define a list of valid roles
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString(), ApprRoleEnum.Printer.ToString() };
+            // Check if the user is authenticated and has a valid role
+            if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+            {
+                return authResponse;
+            }
+
+            // Ensure the query parameter name matches
+            var id = req.Query[HttpParameterConstants.Id];
+
+            // Retrieve the encrypted code by ID from the database
+            var encryptedCode = await _codeService.GetCodeByIdAsync(id);
+
+            if (encryptedCode == null)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteStringAsync($"Code with ID {id} not found.");
+                return notFoundResponse;
+            }
+
+            // Decrypt the code
+            encryptedCode.EncryptedCode = EncryptionHelper.Decrypt(encryptedCode.EncryptedCode);
+
+            // Map the decrypted code to a DTO
+            var codeDto = _mapper.Map<CodeDto>(encryptedCode);
+
+            // Create the response
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+
+            return response;
+        }
+        //[Function("update-code-status")]
+        //public async Task<HttpResponseData> UpdateCodeStatus([HttpTrigger(AuthorizationLevel.Function, "put")] HttpRequestData req, FunctionContext context)
+        //{
+        //    _logger.LogInformation("[Update User Status] Function Started.");
+
+        //    // Define a list of valid roles
+        //    var validRoles = new List<string> { ApprRoleEnum.SuperAdmin.ToString() };
+        //    // Check if the user is authenticated and has a valid role
+        //    if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
+        //    {
+        //        return authResponse;
+        //    }
+
+        //    // Parse the request body to get the new status
+        //    var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+        //    var updateRequest = JsonConvert.DeserializeObject<UpdateCodeStatusRequest>(requestBody);
+
+        //    if (updateRequest == null || string.IsNullOrEmpty(updateRequest.NewStatus))
+        //    {
+        //        var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+        //        await badRequestResponse.WriteAsJsonAsync(new { message = "Invalid request body" });
+        //        return badRequestResponse;
+        //    }
+
+        //    // Update the user status
+        //    var updateResult = await _userDataAccess.UpdateUserStatusAsync(userId, updateRequest.NewStatus);
+
+        //    if (!updateResult)
+        //    {
+        //        var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+        //        await notFoundResponse.WriteAsJsonAsync(new { message = "User not found" });
+        //        return notFoundResponse;
+        //    }
+
+        //    var response = req.CreateResponse(HttpStatusCode.OK);
+        //    await response.WriteAsJsonAsync(new { message = "User status updated successfully" });
+
+        //    _logger.LogInformation("[Update User Status] Function Completed.");
+
+        //    return response;
+        //}
 
         [Function("generate-encryption-key")]
         public async Task<HttpResponseData> GenerateEncryptionKey([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
