@@ -14,6 +14,7 @@ using Microsoft.Azure.Cosmos;
 using JTI.CodeGen.API.Models.Constants;
 using JTI.CodeGen.API.Common.Helpers;
 using System.Net;
+using JTI.CodeGen.API.CodeModule.Dtos;
 
 namespace JTI.CodeGen.API.CodeModule.Services
 {
@@ -39,10 +40,15 @@ namespace JTI.CodeGen.API.CodeModule.Services
             return codes;
         }
 
-        public async Task<List<Code>> GenerateCodesAsync(int numberOfCodes, string brand)
+        public async Task<List<Code>> GenerateCodesAsync(GenerateCodeRequest generateCodeRequest)
         {
-            string batchNumber = CodeServiceHelper.GenerateBatchNumber(brand);
+            int numberOfCodes = generateCodeRequest.NumberOfCodes;
+            string brand = generateCodeRequest.Brand;
+            string printerName = generateCodeRequest.PrinterName;
+            string printerAddress = generateCodeRequest.PrinterAddress;
 
+            string batchNumber = CodeServiceHelper.GenerateBatchNumber(generateCodeRequest.Brand);
+            
             var codes = new List<Code>();
             for (int i = 0; i < numberOfCodes; i++)
             {
@@ -57,6 +63,8 @@ namespace JTI.CodeGen.API.CodeModule.Services
                     DateUpdated = DateTime.UtcNow.ToString(),
                     UpdatedBy = "System",
                     Status = CodeStatusEnum.Pending.ToString(),
+                    PrinterName = printerName,
+                    PrinterAddress = printerAddress,
                 };
                 codes.Add(code);
                 await _codeContainer.CreateItemAsync(code, new PartitionKey(code.BatchNumber));

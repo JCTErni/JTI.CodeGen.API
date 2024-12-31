@@ -18,6 +18,7 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Mvc;
 using JTI.CodeGen.API.Common.DataAccess.Interfaces;
 using JTI.CodeGen.API.Models.Constants;
+using Microsoft.IdentityModel.Tokens;
 
 namespace JTI.CodeGen.API.CodeModule
 {
@@ -128,7 +129,7 @@ namespace JTI.CodeGen.API.CodeModule
             var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
             _logger.LogInformation("[Generate Codes] Request deserialized successfully.");
 
-            if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand))
+            if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand) || string.IsNullOrEmpty(generateCodeRequest.PrinterName) || string.IsNullOrEmpty(generateCodeRequest.PrinterAddress))
             {
                 _logger.LogWarning("[Generate Codes] Missing required parameters.");
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -137,7 +138,7 @@ namespace JTI.CodeGen.API.CodeModule
             }
 
             _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
-            await _codeService.GenerateCodesAsync(generateCodeRequest.NumberOfCodes, generateCodeRequest.Brand);
+            await _codeService.GenerateCodesAsync(generateCodeRequest);
 
             _logger.LogInformation("[Generate Codes] Codes generated successfully.");
 
