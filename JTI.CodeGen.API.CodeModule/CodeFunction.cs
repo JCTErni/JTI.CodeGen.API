@@ -63,7 +63,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDtos));
+            await response.WriteAsJsonAsync(codeDtos);
 
             _logger.LogInformation("[Get All Codes] Function Completed.");
 
@@ -103,7 +103,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDictionary));
+            await response.WriteAsJsonAsync(codeDictionary);
 
             _logger.LogInformation("[Get Codes Paginated] Function Completed.");
 
