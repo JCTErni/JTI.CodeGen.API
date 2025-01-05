@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BCrypt.Net;
-
-namespace JTI.CodeGen.API.UserModule.Helpers
+﻿namespace JTI.CodeGen.API.UserModule.Helpers
 {
     public static class PasswordHelper
     {

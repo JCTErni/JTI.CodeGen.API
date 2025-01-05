@@ -1,17 +1,17 @@
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
-using Microsoft.Azure.Functions.Worker.Http;
-using JTI.CodeGen.API.Models.Constants;
-using System.Net;
-using Newtonsoft.Json;
-using JTI.CodeGen.API.Models.Entities;
-using JTI.CodeGen.API.UserModule.Helpers;
-using JTI.CodeGen.API.UserModule.Dtos;
 using AutoMapper;
-using JTI.CodeGen.API.Models.Enums;
-using JTI.CodeGen.API.Common.Services.Interfaces;
 using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Models.Constants;
+using JTI.CodeGen.API.Models.Entities;
+using JTI.CodeGen.API.Models.Enums;
+using JTI.CodeGen.API.UserModule.Dtos;
+using JTI.CodeGen.API.UserModule.Helpers;
 using JTI.CodeGen.API.UserModule.Services.Interfaces;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System.Net;
 
 namespace JTI.CodeGen.API.UserModule
 {

@@ -1,24 +1,19 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
+using AutoMapper;
+using JTI.CodeGen.API.CodeModule.Dtos;
+using JTI.CodeGen.API.CodeModule.Services.Interfaces;
+using JTI.CodeGen.API.Common.DataAccess;
+using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Models.Constants;
+using JTI.CodeGen.API.Models.Entities;
+using JTI.CodeGen.API.Models.Enums;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Net;
-using JTI.CodeGen.API.Common.DataAccess;
-using JTI.CodeGen.API.Models.Entities;
-using JTI.CodeGen.API.CodeModule.Services.Interfaces;
-using JTI.CodeGen.API.CodeModule.Dtos;
-using AutoMapper;
-using JTI.CodeGen.API.Common.Services.Interfaces;
-using JTI.CodeGen.API.Models.Enums;
-using JTI.CodeGen.API.Common.Helpers;
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Mvc;
-using JTI.CodeGen.API.Common.DataAccess.Interfaces;
-using JTI.CodeGen.API.Models.Constants;
-using Microsoft.IdentityModel.Tokens;
 
 namespace JTI.CodeGen.API.CodeModule
 {
@@ -69,7 +64,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
-        
+
         [Function("get-codes-paginated")]
         public async Task<HttpResponseData> GetCodesPaginated([HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req, FunctionContext context)
         {
@@ -109,9 +104,9 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
-        
+
         [Function("generate-codes")]
-        public async Task<HttpResponseData> GenerateCode([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req, FunctionContext context)
+        public async Task<HttpResponseData> GenerateCode([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req, FunctionContext context, [DurableClient] DurableTaskClient durableClient)
         {
             _logger.LogInformation("[Generate Codes] Function Started.");
 
@@ -125,9 +120,7 @@ namespace JTI.CodeGen.API.CodeModule
             }
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            _logger.LogInformation("[Generate Codes] Request body read successfully.");
             var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
-            _logger.LogInformation("[Generate Codes] Request deserialized successfully.");
 
             if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand) || string.IsNullOrEmpty(generateCodeRequest.PrinterName) || string.IsNullOrEmpty(generateCodeRequest.PrinterAddress))
             {
@@ -138,12 +131,26 @@ namespace JTI.CodeGen.API.CodeModule
             }
 
             _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
-            await _codeService.GenerateCodesAsync(generateCodeRequest);
 
-            _logger.LogInformation("[Generate Codes] Codes generated successfully.");
+            var codes = _codeService.GenerateCodesAsync(generateCodeRequest);
+
+            // Define your batch size here
+            var batchSize = 1000;
+            var batches = new List<List<Code>>();
+
+            for (int i = 0; i < codes.Count; i += batchSize)
+            {
+                batches.Add(codes.GetRange(i, Math.Min(batchSize, codes.Count - i)));
+            }
+
+            // Start a new orchestration instance for each batch
+            foreach (var batch in batches)
+            {
+                await durableClient.ScheduleNewOrchestrationInstanceAsync(nameof(CodeOrchestratorFunction.InsertCodeOrchestrator), batch);
+            }
 
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync($"Successfully generated {generateCodeRequest.NumberOfCodes} codes.");
+            await response.WriteStringAsync("Codes are being generated and inserted.");
 
             _logger.LogInformation("[Generate Codes] Function Completed.");
 
@@ -190,7 +197,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+            await response.WriteAsJsonAsync(codeDto);
 
             _logger.LogInformation("[Get Code By Id] Function Completed.");
 
@@ -237,7 +244,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create the response
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync(JsonConvert.SerializeObject(codeDto));
+            await response.WriteAsJsonAsync(codeDto);
 
             _logger.LogInformation("[Get By Code] Function Completed.");
 
@@ -250,7 +257,7 @@ namespace JTI.CodeGen.API.CodeModule
             _logger.LogInformation("[Update Code Status] Function Started.");
 
             // Define a list of valid roles
-            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString()};
+            var validRoles = new List<string> { ApprRoleEnum.Admin.ToString() };
             // Check if the user is authenticated and has a valid role
             if (await AuthHelper.CheckAuthenticationAndAuthorization(context, req, validRoles) is HttpResponseData authResponse)
             {
@@ -278,7 +285,7 @@ namespace JTI.CodeGen.API.CodeModule
             }
 
             // Retrieve the code from the database
-            var codeToUpdate = updateCodeStatusRequest.Id == null ? 
+            var codeToUpdate = updateCodeStatusRequest.Id == null ?
                 await _codeService.GetCodeByIdAsync(updateCodeStatusRequest.Id) :
                 await _codeService.GetByCodeAsync(updateCodeStatusRequest.Code);
 
@@ -344,5 +351,6 @@ namespace JTI.CodeGen.API.CodeModule
 
             return response;
         }
+
     }
 }

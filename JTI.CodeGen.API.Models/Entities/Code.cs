@@ -1,12 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
-using JTI.CodeGen.API.Models.Enums;
-
-namespace JTI.CodeGen.API.Models.Entities
+﻿namespace JTI.CodeGen.API.Models.Entities
 {
     public class Code
     {

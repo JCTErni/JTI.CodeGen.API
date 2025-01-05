@@ -1,10 +1,10 @@
 ﻿using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Common.Services.Interfaces;
 using JTI.CodeGen.API.Models.Constants;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
-using JTI.CodeGen.API.Common.Services.Interfaces;
 
 namespace JTI.CodeGen.API.Common.Services
 {

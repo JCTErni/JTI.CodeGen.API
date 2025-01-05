@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Security.Cryptography;
-using JTI.CodeGen.API.Common.Helpers;
+﻿using JTI.CodeGen.API.Common.Helpers;
 
 namespace JTI.CodeGen.API.CodeModule.Helpers
 {

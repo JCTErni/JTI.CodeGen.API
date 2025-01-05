@@ -1,20 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using JTI.CodeGen.API.CodeModule.Services;
+﻿using JTI.CodeGen.API.CodeModule.Dtos;
+using JTI.CodeGen.API.CodeModule.Helpers;
 using JTI.CodeGen.API.CodeModule.Services.Interfaces;
 using JTI.CodeGen.API.Common.DataAccess;
+using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Models.Constants;
 using JTI.CodeGen.API.Models.Entities;
 using JTI.CodeGen.API.Models.Enums;
-using Microsoft.Extensions.Logging;
-using JTI.CodeGen.API.CodeModule.Helpers;
 using Microsoft.Azure.Cosmos;
-using JTI.CodeGen.API.Models.Constants;
-using JTI.CodeGen.API.Common.Helpers;
-using System.Net;
-using JTI.CodeGen.API.CodeModule.Dtos;
 
 namespace JTI.CodeGen.API.CodeModule.Services
 {
@@ -40,7 +32,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
             return codes;
         }
 
-        public async Task<List<Code>> GenerateCodesAsync(GenerateCodeRequest generateCodeRequest)
+        public List<Code> GenerateCodesAsync(GenerateCodeRequest generateCodeRequest)
         {
             int numberOfCodes = generateCodeRequest.NumberOfCodes;
             string brand = generateCodeRequest.Brand;
@@ -48,7 +40,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
             string printerAddress = generateCodeRequest.PrinterAddress;
 
             string batchNumber = CodeServiceHelper.GenerateBatchNumber(generateCodeRequest.Brand);
-            
+
             var codes = new List<Code>();
             for (int i = 0; i < numberOfCodes; i++)
             {
@@ -67,11 +59,10 @@ namespace JTI.CodeGen.API.CodeModule.Services
                     PrinterAddress = printerAddress,
                 };
                 codes.Add(code);
-                await _codeContainer.CreateItemAsync(code, new PartitionKey(code.BatchNumber));
             }
             return codes;
         }
-        
+
         public async Task<Code> GetCodeByIdAsync(string id)
         {
             var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
@@ -119,7 +110,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
             codeToUpdate.DateUpdated = DateTime.UtcNow.ToString();
 
             // Replace the item in the container
-            await _codeContainer.ReplaceItemAsync(codeToUpdate, codeToUpdate.id, new PartitionKey(codeToUpdate.BatchNumber));
+            await _codeContainer.ReplaceItemAsync(codeToUpdate, codeToUpdate.id, new PartitionKey(codeToUpdate.EncryptedCode));
             return codeToUpdate;
         }
     }

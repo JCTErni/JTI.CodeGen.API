@@ -1,11 +1,10 @@
-﻿using JTI.CodeGen.API.Models.Constants;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
+﻿using JTI.CodeGen.API.Common.DataAccess;
+using JTI.CodeGen.API.Models.Constants;
 using JTI.CodeGen.API.Models.Entities;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
-using JTI.CodeGen.API.Common.Helpers;
-using JTI.CodeGen.API.Common.DataAccess;
+using Microsoft.Extensions.Logging;
 
 namespace JTI.CodeGen.API.CodeModule
 {

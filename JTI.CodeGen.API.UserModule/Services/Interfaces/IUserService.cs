@@ -1,11 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using JTI.CodeGen.API.UserModule.Dtos;
-using JTI.CodeGen.API.Models.Entities;
+﻿using JTI.CodeGen.API.Models.Entities;
 
 namespace JTI.CodeGen.API.UserModule.Services.Interfaces
 {

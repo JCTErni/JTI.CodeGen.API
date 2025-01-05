@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using JTI.CodeGen.API.Common.DataAccess.Interfaces;
+﻿using JTI.CodeGen.API.Common.DataAccess.Interfaces;
 using JTI.CodeGen.API.Models.Entities;
 using JTI.CodeGen.API.UserModule.Services.Interfaces;
 

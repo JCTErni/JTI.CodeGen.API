@@ -1,22 +1,17 @@
 using JTI.CodeGen.API.Common.DataAccess;
+using JTI.CodeGen.API.Common.DataAccess.Interfaces;
+using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Common.Middleware;
+using JTI.CodeGen.API.Common.Services;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Models.Constants;
+using JTI.CodeGen.API.Models.Entities;
+using JTI.CodeGen.API.UserModule.Dtos;
+using JTI.CodeGen.API.UserModule.Services;
+using JTI.CodeGen.API.UserModule.Services.Interfaces;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using JTI.CodeGen.API.Common.Helpers;
-using JTI.CodeGen.API.Models.Constants;
-using Microsoft.Extensions.Configuration;
-using JTI.CodeGen.API.Models.Entities;
-using JTI.CodeGen.API.UserModule.Dtos;
-using JTI.CodeGen.API.Common.Services.Interfaces;
-using JTI.CodeGen.API.Common.Services;
-using JTI.CodeGen.API.Common.DataAccess.Interfaces;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using JTI.CodeGen.API.Common.Middleware;
-using Microsoft.Extensions.Logging;
-using JTI.CodeGen.API.UserModule.Services.Interfaces;
-using JTI.CodeGen.API.UserModule.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>

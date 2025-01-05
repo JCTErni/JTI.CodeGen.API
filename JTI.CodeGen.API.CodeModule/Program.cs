@@ -1,17 +1,16 @@
+using JTI.CodeGen.API.CodeModule.Dtos;
+using JTI.CodeGen.API.CodeModule.Services;
+using JTI.CodeGen.API.CodeModule.Services.Interfaces;
 using JTI.CodeGen.API.Common.DataAccess;
+using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.Common.Middleware;
+using JTI.CodeGen.API.Common.Services;
+using JTI.CodeGen.API.Common.Services.Interfaces;
+using JTI.CodeGen.API.Models.Constants;
+using JTI.CodeGen.API.Models.Entities;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using JTI.CodeGen.API.Common.Helpers;
-using JTI.CodeGen.API.Models.Constants;
-using Microsoft.Extensions.Configuration;
-using JTI.CodeGen.API.CodeModule.Services.Interfaces;
-using JTI.CodeGen.API.CodeModule.Services;
-using JTI.CodeGen.API.CodeModule.Dtos;
-using JTI.CodeGen.API.Models.Entities;
-using JTI.CodeGen.API.Common.Middleware;
-using JTI.CodeGen.API.Common.Services.Interfaces;
-using JTI.CodeGen.API.Common.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
