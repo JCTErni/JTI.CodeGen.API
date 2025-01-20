@@ -1,6 +1,7 @@
-﻿using JTI.CodeGen.API.Common.DataAccess;
-using JTI.CodeGen.API.Models.Constants;
-using JTI.CodeGen.API.Models.Entities;
+﻿using JTI.CodeGen.API.CodeModule.DataAccess;
+using JTI.CodeGen.API.CodeModule.Constants;
+using JTI.CodeGen.API.CodeModule.Entities;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.DurableTask;
 using Microsoft.Extensions.Logging;
@@ -20,11 +21,11 @@ namespace JTI.CodeGen.API.CodeModule
         [Function("InsertCodeOrchestrator")]
         public static async Task InsertCodeOrchestrator([OrchestrationTrigger] TaskOrchestrationContext context)
         {
-            var codes = context.GetInput<List<Code>>();
+            var input = context.GetInput<InsertCodesOrchestratorInput>();
 
-            // Define your smaller batch size here
-            var smallerBatchSize = 100; // Smaller batch size for further division
-            var smallerBatches = new List<List<Code>>();
+            var containerId = input.ContainerId;
+            var originalMaxThroughput = input.OriginalMaxThroughput;
+            var codeBatches = input.CodeBatches;
 
             var retryOptions = TaskOptions.FromRetryPolicy(new RetryPolicy(
                 maxNumberOfAttempts: 3,
@@ -34,19 +35,26 @@ namespace JTI.CodeGen.API.CodeModule
             var logger = context.CreateReplaySafeLogger<CodeOrchestratorFunction>();
             logger.LogInformation("[InsertCodeOrchestrator] Executing InsertCodeActivity...");
 
-            for (int i = 0; i < codes.Count; i += smallerBatchSize)
+            // Adjust throughput at the start of the orchestration
+            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = 10000 }, retryOptions);
+
+            try
             {
-                smallerBatches.Add(codes.GetRange(i, Math.Min(smallerBatchSize, codes.Count - i)));
+                var batchInsertTasks = new List<Task>();
+
+                foreach (var batch in codeBatches)
+                {
+                    batchInsertTasks.Add(context.CallActivityAsync(nameof(InsertCodeActivity), batch, retryOptions));
+                }
+
+                await Task.WhenAll(batchInsertTasks);
             }
-
-            var tasks = new List<Task>();
-
-            foreach (var batch in smallerBatches)
+            finally
             {
-                tasks.Add(context.CallActivityAsync(nameof(InsertCodeActivity), batch, retryOptions));
+                logger.LogInformation("[InsertCodeOrchestrator] Reverting throughput...");
+                // Revert throughput at the end of the orchestration
+                await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = originalMaxThroughput }, retryOptions);
             }
-
-            await Task.WhenAll(tasks);
         }
 
         [Function("InsertCodeActivity")]
@@ -63,5 +71,31 @@ namespace JTI.CodeGen.API.CodeModule
                 throw;
             }
         }
+
+        [Function("AdjustThroughputActivity")]
+        public async Task AdjustThroughputActivity([ActivityTrigger] AdjustThroughputInput input)
+        {
+            var container = _cosmosDbService.GetContainer(input.ContainerId);
+
+            if (input.Throughput.HasValue)
+            {
+                var throughputProperties = ThroughputProperties.CreateAutoscaleThroughput(input.Throughput.Value);
+                await container.ReplaceThroughputAsync(throughputProperties);
+            }
+        }
+
+        public class InsertCodesOrchestratorInput
+        {
+            public string ContainerId { get; set; }
+            public int? OriginalMaxThroughput { get; set; }
+            public List<List<Code>> CodeBatches { get; set; }
+        }
+
+        public class AdjustThroughputInput
+        {
+            public string ContainerId { get; set; }
+            public int? Throughput { get; set; }
+        }
+
     }
 }

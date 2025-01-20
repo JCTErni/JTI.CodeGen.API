@@ -1,4 +1,4 @@
-﻿namespace JTI.CodeGen.API.Models.Entities
+﻿namespace JTI.CodeGen.API.CodeModule.Entities
 {
     public class Code
     {

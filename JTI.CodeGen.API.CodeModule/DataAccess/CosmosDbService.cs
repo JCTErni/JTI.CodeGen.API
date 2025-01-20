@@ -1,10 +1,10 @@
-﻿using JTI.CodeGen.API.Models.Entities;
+﻿using JTI.CodeGen.API.CodeModule.Entities;
 using Microsoft.Azure.Cosmos;
 using System.Collections.Concurrent;
 using System.Net;
-using JTI.CodeGen.API.Common.Helpers;
+using JTI.CodeGen.API.CodeModule.Helpers;
 
-namespace JTI.CodeGen.API.Common.DataAccess
+namespace JTI.CodeGen.API.CodeModule.DataAccess
 {
     public class CosmosDbService
     {

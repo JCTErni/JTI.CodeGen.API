@@ -1,7 +1,16 @@
-﻿namespace JTI.CodeGen.API.CodeModule.Helpers
+﻿namespace JTI.CodeGen.API.Common.Helpers
 {
     public static class CodeServiceHelper
     {
+        public static string GenerateEncryptedCode()
+        {
+            // Generate a 9-character alphanumeric code
+            string randomCode = GenerateRandomCode(9);
+
+            // Encrypt the generated code
+            return EncryptionHelper.Encrypt(randomCode);
+        }
+
         public static string GenerateRandomCode(int length)
         {
             // Generate a new GUID

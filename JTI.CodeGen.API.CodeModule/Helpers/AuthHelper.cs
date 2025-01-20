@@ -2,7 +2,7 @@
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
-namespace JTI.CodeGen.API.Common.Helpers
+namespace JTI.CodeGen.API.CodeModule.Helpers
 {
     public static class AuthHelper
     {

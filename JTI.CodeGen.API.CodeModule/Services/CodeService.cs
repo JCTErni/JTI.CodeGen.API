@@ -1,11 +1,9 @@
 ﻿using JTI.CodeGen.API.CodeModule.Dtos;
-using JTI.CodeGen.API.CodeModule.Helpers;
 using JTI.CodeGen.API.CodeModule.Services.Interfaces;
-using JTI.CodeGen.API.Common.DataAccess;
-using JTI.CodeGen.API.Common.Helpers;
-using JTI.CodeGen.API.Models.Constants;
-using JTI.CodeGen.API.Models.Entities;
-using JTI.CodeGen.API.Models.Enums;
+using JTI.CodeGen.API.CodeModule.DataAccess;
+using JTI.CodeGen.API.CodeModule.Helpers;
+using JTI.CodeGen.API.CodeModule.Constants;
+using JTI.CodeGen.API.CodeModule.Entities;
 using Microsoft.Azure.Cosmos;
 
 namespace JTI.CodeGen.API.CodeModule.Services
@@ -36,8 +34,6 @@ namespace JTI.CodeGen.API.CodeModule.Services
         {
             int numberOfCodes = generateCodeRequest.NumberOfCodes;
             string brand = generateCodeRequest.Brand;
-            string printerName = generateCodeRequest.PrinterName;
-            string printerAddress = generateCodeRequest.PrinterAddress;
 
             string batchNumber = CodeServiceHelper.GenerateBatchNumber(generateCodeRequest.Brand);
 
@@ -47,16 +43,11 @@ namespace JTI.CodeGen.API.CodeModule.Services
                 var code = new Code
                 {
                     id = Guid.NewGuid().ToString(),
-                    Brand = brand,
-                    BatchNumber = batchNumber,
-                    EncryptedCode = CodeServiceHelper.GenerateEncryptedCode(),
-                    DateCreated = DateTime.UtcNow.ToString(),
-                    CreatedBy = "System",
-                    DateUpdated = DateTime.UtcNow.ToString(),
-                    UpdatedBy = "System",
-                    Status = CodeStatusEnum.Pending.ToString(),
-                    PrinterName = printerName,
-                    PrinterAddress = printerAddress,
+                    code = CodeServiceHelper.GenerateRandomCode(9),
+                    batch = "1",
+                    sequence = "1",
+                    lastupdate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    status = "1",
                 };
                 codes.Add(code);
             }
@@ -77,41 +68,5 @@ namespace JTI.CodeGen.API.CodeModule.Services
             return codes.FirstOrDefault();
         }
 
-        public async Task<Code> GetByCodeAsync(string code)
-        {
-            var encryptedCode = EncryptionHelper.Encrypt(code);
-            var query = new QueryDefinition("SELECT * FROM c WHERE c.EncryptedCode = @encryptedCode")
-                .WithParameter("@encryptedCode", encryptedCode);
-
-            var iterator = _codeContainer.GetItemQueryIterator<Code>(query);
-            var codes = new List<Code>();
-            while (iterator.HasMoreResults)
-            {
-                var response = await iterator.ReadNextAsync();
-                codes.AddRange(response);
-            }
-
-            return codes.FirstOrDefault();
-        }
-
-        public List<Code> DecryptCodes(List<Code> encryptedCodes)
-        {
-            foreach (var encryptedCode in encryptedCodes)
-            {
-                encryptedCode.EncryptedCode = EncryptionHelper.Decrypt(encryptedCode.EncryptedCode);
-            }
-            return encryptedCodes;
-        }
-
-        public async Task<Code> UpdateCodeStatusAsync(Code codeToUpdate, CodeStatusEnum newStatus)
-        {
-            // Update the status and DateUpdated
-            codeToUpdate.Status = newStatus.ToString();
-            codeToUpdate.DateUpdated = DateTime.UtcNow.ToString();
-
-            // Replace the item in the container
-            await _codeContainer.ReplaceItemAsync(codeToUpdate, codeToUpdate.id, new PartitionKey(codeToUpdate.EncryptedCode));
-            return codeToUpdate;
-        }
     }
 }
