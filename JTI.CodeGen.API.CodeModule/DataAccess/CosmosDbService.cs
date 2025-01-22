@@ -34,7 +34,7 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
             return await container.CreateItemAsync(item, partitionKey);
         }
 
-        public async Task BulkInsertAsync<T>(IEnumerable<T> items, string containerName) 
+        public async Task<int> BulkInsertAsync<T>(IEnumerable<T> items, string containerName) 
         {
             var container = GetContainer(containerName);
             var partitionKeyProperty = typeof(T).GetProperty("code");
@@ -44,24 +44,28 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
                 throw new ArgumentException($"The type {typeof(T).Name} does not contain a property named 'code'.");
             }
 
+            int insertedCount = 0;
+
             try
             {
-                List<Task> concurrentTasks = new();
+                List<Task> concurrentTasks = [];
                 foreach (var item in items)
                 {
                     var partitionKeyValue = partitionKeyProperty.GetValue(item);
-                    concurrentTasks.Add(InsertWithRetryAsync(container, item, partitionKeyValue));
+                    concurrentTasks.Add(InsertWithRetryAsync(container, item, partitionKeyValue, () => Interlocked.Increment(ref insertedCount)));
                 }
                 await Task.WhenAll(concurrentTasks);
             }
             catch (Exception ex)
             {
                 // Optionally, you can rethrow the exception or throw a new one with additional context
-                throw new Exception("An error occurred during bulk insert. See inner exception for details.", ex);
+                throw new Exception($"An error occurred during bulk insert. See inner exception for details. Inserted: {insertedCount} Exception: {ex.Message}", ex);
             }
+
+            return insertedCount;
         }
 
-        private async Task InsertWithRetryAsync<T>(Container container, T item, object partitionKeyValue)
+        private async Task InsertWithRetryAsync<T>(Container container, T item, object partitionKeyValue, Action onSuccess)
         {
             int maxRetries = 3;
             int retryCount = 0;
@@ -71,8 +75,9 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
             {
                 try
                 {
-                    await container.CreateItemAsync(item, new PartitionKey(Convert.ToString(partitionKeyValue)));
+                    await container.CreateItemAsync(item, new PartitionKey(partitionKeyValue.ToString()));
                     inserted = true;
+                    onSuccess();
                 }
                 catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
                 {
@@ -83,6 +88,16 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
                         partitionKeyValue = codeItem.code;
                     }
                     retryCount++;
+                }
+                catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    // Handle throttling
+                    await Task.Delay(ex.RetryAfter.GetValueOrDefault(TimeSpan.FromSeconds(1)));
+                    retryCount++;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Failed to insert item after {retryCount} retries. See inner exception for details. Exception: {ex.Message}", ex);
                 }
             }
 

@@ -5,6 +5,7 @@ using JTI.CodeGen.API.CodeModule.Helpers;
 using JTI.CodeGen.API.CodeModule.Constants;
 using JTI.CodeGen.API.CodeModule.Entities;
 using Microsoft.Azure.Cosmos;
+using JTI.CodeGen.API.CodeModule.Enums;
 
 namespace JTI.CodeGen.API.CodeModule.Services
 {
@@ -33,21 +34,23 @@ namespace JTI.CodeGen.API.CodeModule.Services
         public List<Code> GenerateCodesAsync(GenerateCodeRequest generateCodeRequest)
         {
             int numberOfCodes = generateCodeRequest.NumberOfCodes;
-            string brand = generateCodeRequest.Brand;
-
-            string batchNumber = CodeServiceHelper.GenerateBatchNumber(generateCodeRequest.Brand);
+            string batchNumber = generateCodeRequest.Batch;
+            string sequence = generateCodeRequest.Sequence;
+            var lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+            var status = CodeStatusEnum.Generated.ToString();
 
             var codes = new List<Code>();
             for (int i = 0; i < numberOfCodes; i++)
             {
+                string codeValue = CodeServiceHelper.GenerateRandomCode(9);
                 var code = new Code
                 {
-                    id = Guid.NewGuid().ToString(),
-                    code = CodeServiceHelper.GenerateRandomCode(9),
-                    batch = "1",
-                    sequence = "1",
-                    lastupdate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                    status = "1",
+                    id =codeValue,
+                    code = codeValue,
+                    batch = batchNumber,
+                    sequence = sequence,
+                    lastupdate = lastUpdate,
+                    status = status,
                 };
                 codes.Add(code);
             }

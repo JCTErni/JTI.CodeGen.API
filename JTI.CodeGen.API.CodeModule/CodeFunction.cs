@@ -12,6 +12,7 @@ using JTI.CodeGen.API.CodeModule.Helpers;
 using JTI.CodeGen.API.CodeModule.DataAccess;
 using JTI.CodeGen.API.CodeModule.Constants;
 using static JTI.CodeGen.API.CodeModule.CodeOrchestratorFunction;
+using JTI.CodeGen.API.CodeModule.Entities;
 
 
 namespace JTI.CodeGen.API.CodeModule
@@ -30,14 +31,23 @@ namespace JTI.CodeGen.API.CodeModule
         }
 
         [Function("generate-codes")]
-        public async Task<HttpResponseData> GenerateCode([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req, FunctionContext context, [DurableClient] DurableTaskClient durableClient)
+        public async Task<HttpResponseData> GenerateCode([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, FunctionContext context, [DurableClient] DurableTaskClient durableClient)
         {
             _logger.LogInformation("[Generate Codes] Function Started.");
             
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
 
-            if (generateCodeRequest == null || generateCodeRequest.NumberOfCodes <= 0 || string.IsNullOrEmpty(generateCodeRequest.Brand))
+            var numberOfCodes = generateCodeRequest.NumberOfCodes;
+            var brand = generateCodeRequest.Brand;
+            var batch = generateCodeRequest.Batch;
+            var sequence = generateCodeRequest.Sequence;
+
+            if (generateCodeRequest == null || 
+                numberOfCodes <= 0 || 
+                string.IsNullOrEmpty(brand) || 
+                string.IsNullOrEmpty(batch) || 
+                string.IsNullOrEmpty(sequence))
             {
                 _logger.LogWarning("[Generate Codes] Missing required parameters.");
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -47,8 +57,6 @@ namespace JTI.CodeGen.API.CodeModule
 
             _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
 
-            var codes = _codeService.GenerateCodesAsync(generateCodeRequest);
-
             // Adjust autoscale max throughput to 10000 RU/s before bulk insert
             var container = _cosmosDbService.GetContainer(ConfigurationConstants.CodeContainer);
             ThroughputProperties throughputResponse = await container.ReadThroughputAsync(requestOptions: null);
@@ -56,28 +64,47 @@ namespace JTI.CodeGen.API.CodeModule
 
             // Create batches of 10,000 items each
             int batchSize = 10000;
-            var codeBatches = codes
-                .Select((code, index) => new { code, index })
-                .GroupBy(x => x.index / batchSize)
-                .Select(g => g.Select(x => x.code).ToList())
-                .ToList();
+            var codeBatches = new List<List<Code>>();
 
-            var orchestratorInput = new InsertCodesOrchestratorInput
+            for (int i = 0; i < numberOfCodes; i += batchSize)
+            {
+                var batchRequest = new GenerateCodeRequest
+                {
+                    NumberOfCodes = Math.Min(batchSize, numberOfCodes - i),
+                    Brand = brand,
+                    Batch = batch,
+                    Sequence = sequence
+                };
+                var batchCodes = _codeService.GenerateCodesAsync(batchRequest);
+                codeBatches.Add(batchCodes);
+            }
+
+            var orchestratorInput = new ParentInsertCodeOrchestratorInput
             {
                 ContainerId = ConfigurationConstants.CodeContainer,
                 OriginalMaxThroughput = originalMaxThroughput,
-                CodeBatches = codeBatches
+                CodeBatches = codeBatches,
+                Batch = batch,
+                Sequence = sequence
             };
 
-            // Start the orchestration
-            string instanceId = await durableClient.ScheduleNewOrchestrationInstanceAsync(nameof(CodeOrchestratorFunction.InsertCodeOrchestrator), orchestratorInput);
+            try
+            {
+                // Start a new orchestration instance for each batch
+                await durableClient.ScheduleNewOrchestrationInstanceAsync(nameof(CodeOrchestratorFunction.ParentInsertCodeOrchestrator), orchestratorInput);
 
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteStringAsync("Codes are being generated and inserted.");
-
-            _logger.LogInformation("[Generate Codes] Function Completed.");
-
-            return response;
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteStringAsync("Codes are being generated and inserted.");
+                _logger.LogInformation("[Generate Codes] Function Completed.");
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Generate Codes] An error occurred while generating codes.");
+                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync("An error occurred while generating codes.");
+                return errorResponse;
+            }
         }
     }
 }
