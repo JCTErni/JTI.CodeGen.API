@@ -11,7 +11,10 @@ namespace JTI.CodeGen.API.CodeModule.Dtos
     {
         public string ContainerId { get; set; }
         public int? OriginalMaxThroughput { get; set; }
-        public List<List<Code>> CodeBatches { get; set; }
+        public int NumberOfCodes { get; set; }
+        public int CodeLength { get; set; }
+        public int BatchSize { get; set; }
+        public int TotalBatches { get; set; }
         public string Batch { get; set; }
         public string Sequence { get; set; }
     }

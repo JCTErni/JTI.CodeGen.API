@@ -33,23 +33,22 @@ namespace JTI.CodeGen.API.CodeModule.Services
 
         public List<Code> GenerateCodesAsync(GenerateCodeRequest generateCodeRequest)
         {
+            int codeLength = generateCodeRequest.CodeLength;
             int numberOfCodes = generateCodeRequest.NumberOfCodes;
             string batchNumber = generateCodeRequest.Batch;
             string sequence = generateCodeRequest.Sequence;
-            var lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
             var status = CodeStatusEnum.Generated.ToString();
 
             var codes = new List<Code>();
             for (int i = 0; i < numberOfCodes; i++)
             {
-                string codeValue = CodeServiceHelper.GenerateRandomCode(9);
+                string codeValue = CodeServiceHelper.GenerateRandomCode(codeLength);
                 var code = new Code
                 {
                     id =codeValue,
                     code = codeValue,
                     batch = batchNumber,
                     sequence = sequence,
-                    lastupdate = lastUpdate,
                     status = status,
                 };
                 codes.Add(code);

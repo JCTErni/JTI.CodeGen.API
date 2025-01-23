@@ -3,10 +3,10 @@ namespace JTI.CodeGen.API.CodeModule.Dtos
 {
     public class InsertCodesOrchestratorInput
     {
-        public string ContainerId { get; set; }
-        public int? OriginalMaxThroughput { get; set; }
-        public List<Code> CodeBatch { get; set; }
-        public string Batch {  get; set; }
+        public int CodeLength { get; set; }
+        public string Batch { get; set; }
         public string Sequence { get; set; }
+        public int BatchIndex {  get; set; }
+        public int BatchSize { get; set; }
     }
 }

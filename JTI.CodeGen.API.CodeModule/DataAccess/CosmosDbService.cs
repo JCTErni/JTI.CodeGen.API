@@ -3,6 +3,7 @@ using Microsoft.Azure.Cosmos;
 using System.Collections.Concurrent;
 using System.Net;
 using JTI.CodeGen.API.CodeModule.Helpers;
+using JTI.CodeGen.API.CodeModule.Constants;
 
 namespace JTI.CodeGen.API.CodeModule.DataAccess
 {
@@ -67,7 +68,7 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
 
         private async Task InsertWithRetryAsync<T>(Container container, T item, object partitionKeyValue, Action onSuccess)
         {
-            int maxRetries = 3;
+            int maxRetries = CodeGenerationConstants.maxInsertRetryTime;
             int retryCount = 0;
             bool inserted = false;
 
@@ -84,7 +85,8 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
                     // Handle conflict by generating a new code and retrying
                     if (item is Code codeItem)
                     {
-                        codeItem.UpdateCode(CodeServiceHelper.GenerateRandomCode(9));
+                        var itemLength = codeItem.code.Length;
+                        codeItem.UpdateCode(CodeServiceHelper.GenerateRandomCode(itemLength));
                         partitionKeyValue = codeItem.code;
                     }
                     retryCount++;
@@ -92,7 +94,7 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
                 catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
                 {
                     // Handle throttling
-                    await Task.Delay(ex.RetryAfter.GetValueOrDefault(TimeSpan.FromSeconds(1)));
+                    await Task.Delay(ex.RetryAfter.GetValueOrDefault(TimeSpan.FromSeconds(CodeGenerationConstants.insertRetryTime)));
                     retryCount++;
                 }
                 catch (Exception ex)

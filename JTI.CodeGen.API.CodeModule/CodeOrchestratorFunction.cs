@@ -30,38 +30,47 @@ namespace JTI.CodeGen.API.CodeModule
 
             var containerId = input.ContainerId;
             var originalMaxThroughput = input.OriginalMaxThroughput;
-            var codeBatches = input.CodeBatches;
+            var numberOfCodes = input.NumberOfCodes;
+            var codeLength = input.CodeLength;
+            var batchSize = input.BatchSize;
+            var totalBatches = input.TotalBatches;
             var batchNumber = input.Batch;
             var sequence = input.Sequence;
+
+            var requestUnitPerItem = CodeGenerationConstants.requestUnitPerItem;
+            var maxThroughputAdjustment = CodeGenerationConstants.maxThroughputAdjustment;
 
             var logger = context.CreateReplaySafeLogger<CodeOrchestratorFunction>();
             logger.LogInformation("[ParentInsertCodeOrchestrator] Adjusting throughput...");
 
             // Adjust throughput at the start of the orchestration
-            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = 10000 });
+            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = CodeGenerationConstants.maxThroughputAdjustment });
 
             try
             {
                 var tasks = new List<Task>();
 
-                foreach (var batch in codeBatches)
+                for (int i = 0; i < totalBatches; i++)
                 {
+                    // Adjust the batch size for the last batch
+                    int currentBatchSize = (i == totalBatches - 1) ? numberOfCodes - (i * batchSize) : batchSize;
+
                     var subOrchestratorInput = new InsertCodesOrchestratorInput
                     {
-                        ContainerId = containerId,
-                        OriginalMaxThroughput = originalMaxThroughput,
-                        CodeBatch = batch,
+                        CodeLength = codeLength,
                         Batch = batchNumber,
-                        Sequence = sequence
+                        Sequence = sequence,
+                        BatchIndex = i,
+                        BatchSize = currentBatchSize
                     };
 
+                    // Start the sub-orchestrator
                     tasks.Add(context.CallSubOrchestratorAsync(nameof(InsertCodeOrchestrator), subOrchestratorInput));
 
-                    // Introduce a 23 - second delay between each iteration
-                    var nextDelay = context.CurrentUtcDateTime.AddSeconds(23);
+                    // Introduce a 23-second delay between each sub-orchestrator call
+                    var nextDelay = context.CurrentUtcDateTime.AddSeconds((requestUnitPerItem * batchSize) / maxThroughputAdjustment);
                     await context.CreateTimer(nextDelay, CancellationToken.None);
                 }
-
                 await Task.WhenAll(tasks);
             }
             catch (Exception ex)
@@ -82,22 +91,36 @@ namespace JTI.CodeGen.API.CodeModule
         {
             var input = context.GetInput<InsertCodesOrchestratorInput>();
 
-            var codeBatch = input.CodeBatch;
+            var codeLength = input.CodeLength;
             var batchNumber = input.Batch;
             var sequence = input.Sequence;
+            var batchIndex = input.BatchIndex;
+            var batchSize = input.BatchSize;
 
             var logger = context.CreateReplaySafeLogger<CodeOrchestratorFunction>();
             logger.LogInformation("[SubOrchestrator] Executing InsertCodeActivity...");
 
             try
             {
+                // Generate codes for the current batch
+                var batchRequest = new GenerateCodeRequest
+                {
+                    NumberOfCodes = batchSize,
+                    CodeLength = codeLength,
+                    Batch = batchNumber,
+                    Sequence = sequence
+                };
+                var codeBatch = _codeService.GenerateCodesAsync(batchRequest);
+
                 int insertedCount = await context.CallActivityAsync<int>(nameof(InsertCodeActivity), codeBatch);
+
                 if (insertedCount < codeBatch.Count)
                 {
                     int remainingItemsCount = codeBatch.Count - insertedCount;
                     var request = new GenerateCodeRequest
                     {
                         NumberOfCodes = remainingItemsCount,
+                        CodeLength = codeLength,
                         Batch = batchNumber,
                         Sequence = sequence,
                     };
@@ -113,10 +136,11 @@ namespace JTI.CodeGen.API.CodeModule
                 logger.LogError(ex, "[InsertCodeOrchestrator] Batch insert failed. Generating new batch for remaining items. Exception: {ExceptionMessage}", ex.Message);
 
                 // Calculate remaining items and generate new batch
-                int remainingItemsCount = codeBatch.Count - ex.InsertedCount;
+                int remainingItemsCount = batchSize - ex.InsertedCount;
                 var request = new GenerateCodeRequest
                 {
                     NumberOfCodes = remainingItemsCount,
+                    CodeLength = codeLength,
                     Batch = batchNumber,
                     Sequence = sequence,
                 };

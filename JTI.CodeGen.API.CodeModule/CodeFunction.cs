@@ -39,6 +39,7 @@ namespace JTI.CodeGen.API.CodeModule
             var generateCodeRequest = JsonConvert.DeserializeObject<GenerateCodeRequest>(requestBody);
 
             var numberOfCodes = generateCodeRequest.NumberOfCodes;
+            var codeLength = generateCodeRequest.CodeLength;
             var brand = generateCodeRequest.Brand;
             var batch = generateCodeRequest.Batch;
             var sequence = generateCodeRequest.Sequence;
@@ -62,30 +63,20 @@ namespace JTI.CodeGen.API.CodeModule
             ThroughputProperties throughputResponse = await container.ReadThroughputAsync(requestOptions: null);
             int? originalMaxThroughput = throughputResponse.AutoscaleMaxThroughput;
 
-            // Create batches of 10,000 items each
-            int batchSize = 10000;
-            var codeBatches = new List<List<Code>>();
-
-            for (int i = 0; i < numberOfCodes; i += batchSize)
-            {
-                var batchRequest = new GenerateCodeRequest
-                {
-                    NumberOfCodes = Math.Min(batchSize, numberOfCodes - i),
-                    Brand = brand,
-                    Batch = batch,
-                    Sequence = sequence
-                };
-                var batchCodes = _codeService.GenerateCodesAsync(batchRequest);
-                codeBatches.Add(batchCodes);
-            }
+            // Calculate the number of batches needed
+            int batchSize = CodeGenerationConstants.batchSize;
+            int totalBatches = (numberOfCodes + batchSize - 1) / batchSize;
 
             var orchestratorInput = new ParentInsertCodeOrchestratorInput
             {
                 ContainerId = ConfigurationConstants.CodeContainer,
                 OriginalMaxThroughput = originalMaxThroughput,
-                CodeBatches = codeBatches,
+                NumberOfCodes = numberOfCodes,
+                CodeLength = codeLength,
+                BatchSize = batchSize,
                 Batch = batch,
-                Sequence = sequence
+                Sequence = sequence,
+                TotalBatches = totalBatches
             };
 
             try
@@ -102,7 +93,7 @@ namespace JTI.CodeGen.API.CodeModule
             {
                 _logger.LogError(ex, "[Generate Codes] An error occurred while generating codes.");
                 var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                await errorResponse.WriteStringAsync("An error occurred while generating codes.");
+                await errorResponse.WriteStringAsync($"An error occurred while generating codes. {ex.Message}");
                 return errorResponse;
             }
         }
