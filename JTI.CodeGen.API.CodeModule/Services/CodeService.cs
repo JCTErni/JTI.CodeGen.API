@@ -37,7 +37,7 @@ namespace JTI.CodeGen.API.CodeModule.Services
             int numberOfCodes = generateCodeRequest.NumberOfCodes;
             string batchNumber = generateCodeRequest.Batch;
             string sequence = generateCodeRequest.Sequence;
-            var status = CodeStatusEnum.Generated.ToString();
+            var status = ((int)CodeStatusEnum.Generated).ToString();
 
             var codes = new List<Code>();
             for (int i = 0; i < numberOfCodes; i++)
