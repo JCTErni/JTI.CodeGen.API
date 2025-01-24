@@ -4,6 +4,8 @@ using System.Collections.Concurrent;
 using System.Net;
 using JTI.CodeGen.API.CodeModule.Helpers;
 using JTI.CodeGen.API.CodeModule.Constants;
+using System.Reflection;
+using JTI.CodeGen.API.CodeModule.Dtos.Exceptions;
 
 namespace JTI.CodeGen.API.CodeModule.DataAccess
 {
@@ -35,38 +37,50 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
             return await container.CreateItemAsync(item, partitionKey);
         }
 
-        public async Task<int> BulkInsertAsync<T>(IEnumerable<T> items, string containerName) 
+        public async Task<List<T>> BulkInsertAsync<T>(IEnumerable<T> items, string containerName) 
         {
             var container = GetContainer(containerName);
-            var partitionKeyProperty = typeof(T).GetProperty("code");
+
+            PropertyInfo partitionKeyProperty = null;
+            if (container.Id == ConfigurationConstants.CodeContainer)
+            {
+                partitionKeyProperty = typeof(T).GetProperty("code");
+            }else if (container.Id == ConfigurationConstants.CodeByBatchContainer)
+            {
+                partitionKeyProperty = typeof(T).GetProperty("batch");
+            }
 
             if (partitionKeyProperty == null)
             {
-                throw new ArgumentException($"The type {typeof(T).Name} does not contain a property named 'code'.");
+                throw new ArgumentException($"The type {typeof(T).Name} does not contain the needed property.");
             }
 
-            int insertedCount = 0;
+            var insertedCodes = new ConcurrentBag<T>();
 
             try
             {
-                List<Task> concurrentTasks = [];
+                List<Task> concurrentTasks = new List<Task>();
                 foreach (var item in items)
                 {
                     var partitionKeyValue = partitionKeyProperty.GetValue(item);
-                    concurrentTasks.Add(InsertWithRetryAsync(container, item, partitionKeyValue, () => Interlocked.Increment(ref insertedCount)));
+                    concurrentTasks.Add(InsertWithRetryAsync(container, item, partitionKeyValue, partitionKeyProperty.Name, () => insertedCodes.Add(item)));
                 }
                 await Task.WhenAll(concurrentTasks);
             }
             catch (Exception ex)
             {
                 // Optionally, you can rethrow the exception or throw a new one with additional context
-                throw new Exception($"An error occurred during bulk insert. See inner exception for details. Inserted: {insertedCount} Exception: {ex.Message}", ex);
+                if(container.Id == ConfigurationConstants.CodeByBatchContainer)
+                {
+                    throw new BulkInsertException<T>($"An error occurred during bulk insert. See inner exception for details. Inserted: {insertedCodes.Count} Exception: {ex.Message}", insertedCodes.ToList(), ex);
+                }
+                throw new Exception($"An error occurred during bulk insert. See inner exception for details. Inserted: {insertedCodes.Count} Exception: {ex.Message}", ex);
             }
 
-            return insertedCount;
+            return insertedCodes.ToList();
         }
 
-        private async Task InsertWithRetryAsync<T>(Container container, T item, object partitionKeyValue, Action onSuccess)
+        private async Task InsertWithRetryAsync<T>(Container container, T item, object partitionKeyValue, string partitionKeyName, Action onSuccess)
         {
             int maxRetries = CodeGenerationConstants.maxInsertRetryTime;
             int retryCount = 0;
@@ -83,7 +97,7 @@ namespace JTI.CodeGen.API.CodeModule.DataAccess
                 catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
                 {
                     // Handle conflict by generating a new code and retrying
-                    if (item is Code codeItem)
+                    if (item is Code codeItem && partitionKeyName == "code")
                     {
                         var itemLength = codeItem.code.Length;
                         codeItem.UpdateCode(CodeServiceHelper.GenerateRandomCode(itemLength));

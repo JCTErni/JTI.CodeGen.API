@@ -9,8 +9,10 @@ namespace JTI.CodeGen.API.CodeModule.Dtos
 {
     public class ParentInsertCodeOrchestratorInput
     {
-        public string ContainerId { get; set; }
-        public int? OriginalMaxThroughput { get; set; }
+        public string CodeContainerId { get; set; }
+        public string CodeByBatchContainerId { get; set; }
+        public int? CodeOriginalMaxThroughput { get; set; }
+        public int? CodeByBatchOriginalMaxThroughput { get; set; }
         public int NumberOfCodes { get; set; }
         public int CodeLength { get; set; }
         public int BatchSize { get; set; }

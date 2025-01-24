@@ -28,8 +28,10 @@ namespace JTI.CodeGen.API.CodeModule
         {
             var input = context.GetInput<ParentInsertCodeOrchestratorInput>();
 
-            var containerId = input.ContainerId;
-            var originalMaxThroughput = input.OriginalMaxThroughput;
+            var codeContainerId = input.CodeContainerId;
+            var codeByBatchContainerId = input.CodeByBatchContainerId;
+            var codeOriginalMaxThroughput = input.CodeOriginalMaxThroughput;
+            var codeByBatchOriginalMaxThroughput = input.CodeByBatchOriginalMaxThroughput;
             var numberOfCodes = input.NumberOfCodes;
             var codeLength = input.CodeLength;
             var batchSize = input.BatchSize;
@@ -44,7 +46,8 @@ namespace JTI.CodeGen.API.CodeModule
             logger.LogInformation("[ParentInsertCodeOrchestrator] Adjusting throughput...");
 
             // Adjust throughput at the start of the orchestration
-            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = CodeGenerationConstants.maxThroughputAdjustment });
+            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = codeContainerId, Throughput = maxThroughputAdjustment });
+            await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = codeByBatchContainerId, Throughput = maxThroughputAdjustment });
 
             try
             {
@@ -67,7 +70,7 @@ namespace JTI.CodeGen.API.CodeModule
                     // Start the sub-orchestrator
                     tasks.Add(context.CallSubOrchestratorAsync(nameof(InsertCodeOrchestrator), subOrchestratorInput));
 
-                    // Introduce a 23-second delay between each sub-orchestrator call
+                    // Introduce a delay between each sub-orchestrator call
                     var nextDelay = context.CurrentUtcDateTime.AddSeconds((requestUnitPerItem * batchSize) / maxThroughputAdjustment);
                     await context.CreateTimer(nextDelay, CancellationToken.None);
                 }
@@ -82,7 +85,13 @@ namespace JTI.CodeGen.API.CodeModule
             {
                 logger.LogInformation("[ParentOrchestrator] Reverting throughput...");
                 // Revert throughput at the end of the orchestration
-                await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = containerId, Throughput = originalMaxThroughput });
+                await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = codeContainerId, Throughput = codeOriginalMaxThroughput });
+
+                // Introduce a 1-minute delay
+                var delayUntil = context.CurrentUtcDateTime.AddMinutes(1);
+                await context.CreateTimer(delayUntil, CancellationToken.None);
+
+                await context.CallActivityAsync(nameof(AdjustThroughputActivity), new AdjustThroughputInput { ContainerId = codeByBatchContainerId, Throughput = codeByBatchOriginalMaxThroughput });
             }
         }
 
@@ -112,8 +121,8 @@ namespace JTI.CodeGen.API.CodeModule
                 };
                 var codeBatch = _codeService.GenerateCodesAsync(batchRequest);
 
-                int insertedCount = await context.CallActivityAsync<int>(nameof(InsertCodeActivity), codeBatch);
-
+                var insertedCodes = await context.CallActivityAsync<List<Code>>(nameof(InsertCodeActivity), codeBatch);
+                int insertedCount = insertedCodes.Count;
                 if (insertedCount < codeBatch.Count)
                 {
                     int remainingItemsCount = codeBatch.Count - insertedCount;
@@ -128,7 +137,7 @@ namespace JTI.CodeGen.API.CodeModule
 
                     // Retry insertion for remaining items
                     logger.LogInformation("[InsertCodeOrchestrator] Retrying insertion for {RemainingItemsCount} remaining codes.", remainingItemsCount);
-                    await context.CallActivityAsync(nameof(InsertCodeActivity), remainingItems);
+                    insertedCodes = await context.CallActivityAsync<List<Code>>(nameof(InsertCodeActivity), remainingItems);
                 }
             }
             catch (BatchInsertException ex)
@@ -148,7 +157,7 @@ namespace JTI.CodeGen.API.CodeModule
 
                 // Retry insertion for remaining items
                 logger.LogInformation("[InsertCodeOrchestrator] Retrying insertion for {RemainingItemsCount} remaining codes after exception.", remainingItemsCount);
-                await context.CallActivityAsync(nameof(InsertCodeActivity), remainingItems);
+                var insertedCodes = await context.CallActivityAsync<List<Code>>(nameof(InsertCodeActivity), remainingItems);
             }
             catch (Exception ex)
             {
@@ -159,20 +168,21 @@ namespace JTI.CodeGen.API.CodeModule
         }
 
         [Function("InsertCodeActivity")]
-        public async Task<int> InsertCodeActivity([ActivityTrigger] List<Code> codes)
+        public async Task<List<Code>> InsertCodeActivity([ActivityTrigger] List<Code> codes)
         {
-            int insertedCount = 0;
+            var insertedCodes = new List<Code>();
 
             try
             {
-                insertedCount = await _cosmosDbService.BulkInsertAsync(codes, ConfigurationConstants.CodeContainer);
+                insertedCodes = await _cosmosDbService.BulkInsertAsync(codes, ConfigurationConstants.CodeContainer);
+                int insertedCount = insertedCodes.Count;
                 _logger.LogInformation("[InsertCodeActivity] Bulk insert completed successfully. Inserted {InsertedCount} items.", insertedCount);
-                return insertedCount;
+                return insertedCodes;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[InsertCodeActivity] Bulk insert failed. Inserted {InsertedCount} items before failure. Exception: {ExceptionMessage}", insertedCount, ex.Message);
-                throw new BatchInsertException("Bulk insert failed.", insertedCount, ex);
+                _logger.LogError(ex, "[InsertCodeActivity] Bulk insert failed. Inserted {InsertedCount} items before failure. Exception: {ExceptionMessage}", insertedCodes.Count, ex.Message);
+                throw new BatchInsertException("Bulk insert failed.", insertedCodes.Count, ex);
             }
         }
 
@@ -187,12 +197,33 @@ namespace JTI.CodeGen.API.CodeModule
                 {
                     var throughputProperties = ThroughputProperties.CreateAutoscaleThroughput(input.Throughput.Value);
                     await container.ReplaceThroughputAsync(throughputProperties);
-                    _logger.LogInformation("[AdjustThroughputActivity] Throughput adjusted to {Throughput} RU/s.", input.Throughput.Value);
+                    _logger.LogInformation($"[AdjustThroughputActivity] {input.ContainerId} Throughput adjusted to {input.Throughput.Value} RU/s.");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[AdjustThroughputActivity] An error occurred while adjusting throughput. Exception: {ExceptionMessage}", ex.Message);
+                _logger.LogError($"[AdjustThroughputActivity] An error occurred while adjusting throughput of {input.ContainerId}. Exception: {ex.Message}");
+                throw; // Rethrow the exception to propagate it back to the orchestrator
+            }
+        }
+
+        [Function("CodeTriggerAdjustThroughputActivity")]
+        public async Task CodeTriggerAdjustThroughputActivity([ActivityTrigger] AdjustThroughputInput input)
+        {
+            try
+            {
+                var container = _cosmosDbService.GetContainer(input.ContainerId);
+
+                if (input.Throughput.HasValue)
+                {
+                    var throughputProperties = ThroughputProperties.CreateAutoscaleThroughput(input.Throughput.Value);
+                    await container.ReplaceThroughputAsync(throughputProperties);
+                    _logger.LogInformation("[CodeTriggerAdjustThroughputActivity] Throughput adjusted to {Throughput} RU/s.", input.Throughput.Value);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[CodeTriggerAdjustThroughputActivity] An error occurred while adjusting throughput. Exception: {ExceptionMessage}", ex.Message);
                 throw; // Rethrow the exception to propagate it back to the orchestrator
             }
         }

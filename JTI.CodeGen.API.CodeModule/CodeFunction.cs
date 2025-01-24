@@ -46,6 +46,7 @@ namespace JTI.CodeGen.API.CodeModule
 
             if (generateCodeRequest == null || 
                 numberOfCodes <= 0 || 
+                codeLength <= 0 ||
                 string.IsNullOrEmpty(brand) || 
                 string.IsNullOrEmpty(batch) || 
                 string.IsNullOrEmpty(sequence))
@@ -59,9 +60,13 @@ namespace JTI.CodeGen.API.CodeModule
             _logger.LogInformation("[Generate Codes] Generating codes for Brand: {Brand}, Number of Codes: {NumberOfCodes}", generateCodeRequest.Brand, generateCodeRequest.NumberOfCodes);
 
             // Adjust autoscale max throughput to 10000 RU/s before bulk insert
-            var container = _cosmosDbService.GetContainer(ConfigurationConstants.CodeContainer);
-            ThroughputProperties throughputResponse = await container.ReadThroughputAsync(requestOptions: null);
-            int? originalMaxThroughput = throughputResponse.AutoscaleMaxThroughput;
+            var codeContainer = _cosmosDbService.GetContainer(ConfigurationConstants.CodeContainer);
+            ThroughputProperties codeThroughputResponse = await codeContainer.ReadThroughputAsync(requestOptions: null);
+            int? codeOriginalMaxThroughput = codeThroughputResponse.AutoscaleMaxThroughput;
+
+            var codeByBatchContainer = _cosmosDbService.GetContainer(ConfigurationConstants.CodeByBatchContainer);
+            ThroughputProperties codeByBatchthroughputResponse = await codeByBatchContainer.ReadThroughputAsync(requestOptions: null);
+            int? codeByBatchOriginalMaxThroughput = codeByBatchthroughputResponse.AutoscaleMaxThroughput;
 
             // Calculate the number of batches needed
             int batchSize = CodeGenerationConstants.batchSize;
@@ -69,8 +74,10 @@ namespace JTI.CodeGen.API.CodeModule
 
             var orchestratorInput = new ParentInsertCodeOrchestratorInput
             {
-                ContainerId = ConfigurationConstants.CodeContainer,
-                OriginalMaxThroughput = originalMaxThroughput,
+                CodeContainerId = ConfigurationConstants.CodeContainer,
+                CodeByBatchContainerId = ConfigurationConstants.CodeByBatchContainer,
+                CodeOriginalMaxThroughput = codeOriginalMaxThroughput,
+                CodeByBatchOriginalMaxThroughput = codeByBatchOriginalMaxThroughput,
                 NumberOfCodes = numberOfCodes,
                 CodeLength = codeLength,
                 BatchSize = batchSize,
